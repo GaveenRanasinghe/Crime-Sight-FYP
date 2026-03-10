@@ -58,7 +58,7 @@ export default function Home() {
             <div>
               <h1 className="text-5xl font-bold mb-6">Sri Lanka Crime Prediction System</h1>
               <p className="text-xl text-blue-100 mb-8">
-                Advanced analytics and predictive modeling for district-level crime statistics. Leverage historical data to forecast trends and identify high-risk areas.
+                Advanced analytics and predictive modeling for district level crime statistics. Leverage historical data to forecast trends and identify high risk areas.
               </p>
               <div className="flex gap-4">
                 {isAuthenticated ? (

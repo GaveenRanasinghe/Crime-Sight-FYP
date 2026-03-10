@@ -40,8 +40,12 @@ function Navigation({ onSidebarStateChange }: { onSidebarStateChange: (open: boo
           <div className="p-6 border-b border-blue-700">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-blue-900 font-bold text-lg">CP</span>
-              </div>
+        <img
+          src="/logo.png"
+          alt="CrimeSight Logo"
+          className="w-10 h-10 object-contain"
+  />
+</div>
               {sidebarOpen && (
                 <span className="text-xl font-bold whitespace-nowrap">CrimeSight</span>
               )}
