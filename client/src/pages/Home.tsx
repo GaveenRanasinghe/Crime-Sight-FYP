@@ -7,7 +7,8 @@ import { trpc } from "@/lib/trpc";
 
 export default function Home() {
   const { user, isAuthenticated } = useAuth();
-  const { data: summary, isLoading } = trpc.crime.getDashboardSummary.useQuery();
+  const { data: summary, isLoading } =
+  (trpc as any).crime.getDashboardSummary.useQuery();
 
   const features = [
     {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,19 +8,85 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
 const COLORS = ["#ef4444", "#f97316", "#eab308", "#84cc16", "#22c55e"];
-const RISK_COLORS = {
+const RISK_COLORS: Record<string, string> = {
   critical: "#dc2626",
   high: "#ea580c",
   medium: "#f59e0b",
   low: "#10b981",
 };
 
+interface CrimeStatistic {
+  year: number;
+  total?: number;
+  rapeCases?: number;
+  homicide?: number;
+  attemptedHomicide?: number;
+  abduction?: number;
+  kidnapping?: number;
+  arson?: number;
+  theftOver50k?: number;
+  grievousHurt?: number;
+  hurtByKnife?: number;
+  robbery?: number;
+  extortion?: number;
+  unnaturalOffense?: number;
+  sexualAbuse?: number;
+}
+
+interface StatItem {
+  crime_statistics: CrimeStatistic;
+}
+
+interface DistrictSummary {
+  totalCrimes: number;
+  averagePerYear: number;
+  trend: string;
+  riskLevel: string;
+  yearOverYearChange: number;
+}
+
+interface HighRiskDistrict {
+  district: { id: string | number; name: string };
+  summary: DistrictSummary;
+}
+
+interface DashboardSummary {
+  totalDistricts: number;
+  totalCrimes: number;
+  averageCrimesPerDistrict: number;
+  highRiskCount: number;
+  highRiskDistricts: HighRiskDistrict[];
+}
+
+function getCrimeCount(stat: CrimeStatistic, type: string): number {
+  switch (type) {
+    case "Rape Cases": return stat.rapeCases || 0;
+    case "Homicide": return stat.homicide || 0;
+    case "Attempted Homicide": return stat.attemptedHomicide || 0;
+    case "Abduction": return stat.abduction || 0;
+    case "Kidnapping": return stat.kidnapping || 0;
+    case "Arson": return stat.arson || 0;
+    case "Theft over Rs. 50,000": return stat.theftOver50k || 0;
+    case "Grievous Hurt": return stat.grievousHurt || 0;
+    case "Hurt by Knife": return stat.hurtByKnife || 0;
+    case "Robbery": return stat.robbery || 0;
+    case "Extortion": return stat.extortion || 0;
+    case "Unnatural Offense": return stat.unnaturalOffense || 0;
+    case "Sexual Abuse": return stat.sexualAbuse || 0;
+    default: return 0;
+  }
+}
+
 export default function Dashboard() {
-  const { data: summary, isLoading: summaryLoading } = trpc.crime.getDashboardSummary.useQuery();
-  const { data: allStats } = trpc.crime.getAllStats.useQuery();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const crimeRouter = (trpc as any).crime;
+  const { data: summary, isLoading: summaryLoading }: { data: DashboardSummary | undefined; isLoading: boolean } =
+    crimeRouter.getDashboardSummary.useQuery();
+  const { data: allStats }: { data: StatItem[] | undefined } =
+    crimeRouter.getAllStats.useQuery();
+
   const [selectedYear, setSelectedYear] = useState<string>("2023");
   const [selectedCrimeType, setSelectedCrimeType] = useState<string>("Robbery");
-  const [selectedDistrict, setSelectedDistrict] = useState<string>("");
 
   const years = ["2021", "2022", "2023"];
   const crimeTypes = [
@@ -40,9 +106,9 @@ export default function Dashboard() {
   ];
 
   // Prepare year-over-year comparison data
-  const yearData = years.map(year => {
-    const yearStats = allStats?.filter(item => item.crime_statistics.year === parseInt(year)) || [];
-    const total = yearStats.reduce((sum, item) => sum + (item.crime_statistics.total || 0), 0);
+  const yearData = years.map((year) => {
+    const yearStats = allStats?.filter((item: StatItem) => item.crime_statistics.year === parseInt(year)) || [];
+    const total = yearStats.reduce((sum: number, item: StatItem) => sum + (item.crime_statistics.total || 0), 0);
     return {
       year,
       total,
@@ -51,115 +117,17 @@ export default function Dashboard() {
   });
 
   // Prepare crime type distribution for selected year
-  const crimeTypeData = crimeTypes.map(type => {
-    const yearStats = allStats?.filter(item => item.crime_statistics.year === parseInt(selectedYear)) || [];
-    let total = 0;
-
-    yearStats.forEach(item => {
-      const stat = item.crime_statistics;
-      switch (type) {
-        case "Rape Cases":
-          total += stat.rapeCases || 0;
-          break;
-        case "Homicide":
-          total += stat.homicide || 0;
-          break;
-        case "Attempted Homicide":
-          total += stat.attemptedHomicide || 0;
-          break;
-        case "Abduction":
-          total += stat.abduction || 0;
-          break;
-        case "Kidnapping":
-          total += stat.kidnapping || 0;
-          break;
-        case "Arson":
-          total += stat.arson || 0;
-          break;
-        case "Theft over Rs. 50,000":
-          total += stat.theftOver50k || 0;
-          break;
-        case "Grievous Hurt":
-          total += stat.grievousHurt || 0;
-          break;
-        case "Hurt by Knife":
-          total += stat.hurtByKnife || 0;
-          break;
-        case "Robbery":
-          total += stat.robbery || 0;
-          break;
-        case "Extortion":
-          total += stat.extortion || 0;
-          break;
-        case "Unnatural Offense":
-          total += stat.unnaturalOffense || 0;
-          break;
-        case "Sexual Abuse":
-          total += stat.sexualAbuse || 0;
-          break;
-      }
-    });
-
-    return {
-      name: type,
-      value: total,
-    };
-  }).filter(item => item.value > 0);
+  const crimeTypeData = crimeTypes.map((type) => {
+    const yearStats = allStats?.filter((item: StatItem) => item.crime_statistics.year === parseInt(selectedYear)) || [];
+    const total = yearStats.reduce((sum: number, item: StatItem) => sum + getCrimeCount(item.crime_statistics, type), 0);
+    return { name: type, value: total };
+  }).filter((item) => item.value > 0);
 
   // Prepare trend data for selected crime type
-  const trendData = years.map(year => {
-    const yearStats = allStats?.filter(item => item.crime_statistics.year === parseInt(year)) || [];
-    let total = 0;
-
-    yearStats.forEach(item => {
-      const stat = item.crime_statistics;
-      switch (selectedCrimeType) {
-        case "Rape Cases":
-          total += stat.rapeCases || 0;
-          break;
-        case "Homicide":
-          total += stat.homicide || 0;
-          break;
-        case "Attempted Homicide":
-          total += stat.attemptedHomicide || 0;
-          break;
-        case "Abduction":
-          total += stat.abduction || 0;
-          break;
-        case "Kidnapping":
-          total += stat.kidnapping || 0;
-          break;
-        case "Arson":
-          total += stat.arson || 0;
-          break;
-        case "Theft over Rs. 50,000":
-          total += stat.theftOver50k || 0;
-          break;
-        case "Grievous Hurt":
-          total += stat.grievousHurt || 0;
-          break;
-        case "Hurt by Knife":
-          total += stat.hurtByKnife || 0;
-          break;
-        case "Robbery":
-          total += stat.robbery || 0;
-          break;
-        case "Extortion":
-          total += stat.extortion || 0;
-          break;
-        case "Unnatural Offense":
-          total += stat.unnaturalOffense || 0;
-          break;
-        case "Sexual Abuse":
-          total += stat.sexualAbuse || 0;
-          break;
-      }
-    });
-
-    return {
-      year,
-      count: total,
-    };
+  const trendData = years.map((year) => {
+    const yearStats = allStats?.filter((item: StatItem) => item.crime_statistics.year === parseInt(year)) || [];
+    const total = yearStats.reduce((sum: number, item: StatItem) => sum + getCrimeCount(item.crime_statistics, selectedCrimeType), 0);
+    return { year, count: total };
   });
 
   const handlePrint = () => {
@@ -170,13 +138,13 @@ export default function Dashboard() {
     if (!summary?.highRiskDistricts) return;
 
     let csv = "District,Total Crimes,Average per Year,Trend,Risk Level,YoY Change\n";
-    summary.highRiskDistricts.forEach(item => {
+    summary.highRiskDistricts.forEach((item: HighRiskDistrict) => {
       csv += `"${item.district.name}",${item.summary.totalCrimes},${item.summary.averagePerYear},"${item.summary.trend}","${item.summary.riskLevel}",${item.summary.yearOverYearChange}\n`;
     });
 
     const element = document.createElement("a");
     element.setAttribute("href", "data:text/csv;charset=utf-8," + encodeURIComponent(csv));
-    element.setAttribute("download", `crime-report-${new Date().toISOString().split('T')[0]}.csv`);
+    element.setAttribute("download", `crime-report-${new Date().toISOString().split("T")[0]}.csv`);
     element.style.display = "none";
     document.body.appendChild(element);
     element.click();
@@ -198,21 +166,11 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
       <style>{`
         @media print {
-          body {
-            background: white;
-          }
-          .no-print {
-            display: none !important;
-          }
-          .print-only {
-            display: block !important;
-          }
-          .max-w-7xl {
-            max-width: 100%;
-          }
-          .grid {
-            page-break-inside: avoid;
-          }
+          body { background: white; }
+          .no-print { display: none !important; }
+          .print-only { display: block !important; }
+          .max-w-7xl { max-width: 100%; }
+          .grid { page-break-inside: avoid; }
         }
       `}</style>
       <div className="max-w-7xl mx-auto">
@@ -290,8 +248,8 @@ export default function Dashboard() {
           <Alert className="mb-8 border-red-200 bg-red-50">
             <AlertCircle className="h-4 w-4 text-red-600" />
             <AlertDescription className="text-red-800">
-              <strong>{summary.highRiskDistricts.length} districts</strong> identified as high-risk or critical: {" "}
-              {summary.highRiskDistricts.slice(0, 3).map(d => d.district.name).join(", ")}
+              <strong>{summary.highRiskDistricts.length} districts</strong> identified as high-risk or critical:{" "}
+              {summary.highRiskDistricts.slice(0, 3).map((d: HighRiskDistrict) => d.district.name).join(", ")}
               {summary.highRiskDistricts.length > 3 && ` and ${summary.highRiskDistricts.length - 3} more`}
             </AlertDescription>
           </Alert>
@@ -311,7 +269,7 @@ export default function Dashboard() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="year" />
                   <YAxis />
-                  <Tooltip formatter={(value) => value.toLocaleString()} />
+                  <Tooltip formatter={(value: number) => value.toLocaleString()} />
                   <Legend />
                   <Line type="monotone" dataKey="total" stroke="#3b82f6" strokeWidth={2} name="Total Crimes" />
                   <Line type="monotone" dataKey="average" stroke="#8b5cf6" strokeWidth={2} name="Average per District" />
@@ -330,7 +288,7 @@ export default function Dashboard() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {years.map(year => (
+                    {years.map((year) => (
                       <SelectItem key={year} value={year}>{year}</SelectItem>
                     ))}
                   </SelectContent>
@@ -345,17 +303,17 @@ export default function Dashboard() {
                     cx="35%"
                     cy="50%"
                     labelLine={true}
-                    label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                    label={({ percent }: { percent: number }) => `${(percent * 100).toFixed(0)}%`}
                     outerRadius={70}
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {crimeTypeData.map((entry, index) => (
+                    {crimeTypeData.map((_entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value) => value.toLocaleString()} />
-                  <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{paddingLeft: "20px"}} />
+                  <Tooltip formatter={(value: number) => value.toLocaleString()} />
+                  <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ paddingLeft: "20px" }} />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
@@ -373,7 +331,7 @@ export default function Dashboard() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {crimeTypes.map(type => (
+                    {crimeTypes.map((type) => (
                       <SelectItem key={type} value={type}>{type}</SelectItem>
                     ))}
                   </SelectContent>
@@ -387,7 +345,7 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="year" />
                 <YAxis />
-                <Tooltip formatter={(value) => value.toLocaleString()} />
+                <Tooltip formatter={(value: number) => value.toLocaleString()} />
                 <Bar dataKey="count" fill="#3b82f6" name={selectedCrimeType} />
               </BarChart>
             </ResponsiveContainer>
@@ -415,7 +373,7 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {summary.highRiskDistricts.map(item => (
+                    {summary.highRiskDistricts.map((item: HighRiskDistrict) => (
                       <tr key={item.district.id} className="border-b hover:bg-gray-50">
                         <td className="py-3 px-4">{item.district.name}</td>
                         <td className="py-3 px-4">{item.summary.totalCrimes.toLocaleString()}</td>
@@ -427,7 +385,7 @@ export default function Dashboard() {
                             ) : item.summary.trend === "decreasing" ? (
                               <TrendingDown className="w-4 h-4 text-green-600" />
                             ) : (
-                              <div className="w-4 h-4 text-gray-400">→</div>
+                              <span className="w-4 h-4 text-gray-400">→</span>
                             )}
                             <span className="capitalize">{item.summary.trend}</span>
                           </div>
@@ -435,7 +393,7 @@ export default function Dashboard() {
                         <td className="py-3 px-4">
                           <span
                             className="px-2 py-1 rounded text-white text-xs font-semibold"
-                            style={{ backgroundColor: RISK_COLORS[item.summary.riskLevel as keyof typeof RISK_COLORS] }}
+                            style={{ backgroundColor: RISK_COLORS[item.summary.riskLevel] || "#6b7280" }}
                           >
                             {item.summary.riskLevel.toUpperCase()}
                           </span>
