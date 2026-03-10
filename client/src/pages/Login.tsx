@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { supabase } from "@/lib/supabase";
+import { Mail, Lock, Shield } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -46,56 +47,95 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="p-6">
-        <Link
-          href="/"
-          className="text-blue-600 hover:text-blue-800 font-medium"
-        >
-          ← Back to Home
-        </Link>
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 px-6">
 
-      <div className="flex items-center justify-center">
-        <div className="bg-white shadow-lg rounded-lg p-8 w-full max-w-md">
-          <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
+      {/* Back Button */}
+      <Link
+        href="/"
+        className="absolute top-6 left-6 text-white/80 hover:text-white text-sm"
+      >
+        ← Back to Home
+      </Link>
 
-          {error && (
-            <p className="text-red-600 text-sm mb-4 text-center">{error}</p>
-          )}
+      {/* Login Card */}
+      <div className="w-full max-w-md bg-white/90 backdrop-blur-lg shadow-2xl rounded-2xl p-8">
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
+        {/* Logo / Title */}
+        <div className="flex flex-col items-center mb-6">
+          <div className="bg-blue-900 text-white p-3 rounded-xl mb-3">
+            <Shield size={28} />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800">CrimeSight Login</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Admin Access
+          </p>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="bg-red-100 text-red-700 text-sm p-3 rounded mb-4 text-center">
+            {error}
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleLogin} className="space-y-4">
+
+          {/* Email */}
+          <div>
+            <label className="text-sm text-gray-600">Email</label>
+            <div className="flex items-center border rounded-lg px-3 mt-1 focus-within:ring-2 focus-within:ring-blue-600">
+              <Mail className="text-gray-400 mr-2" size={18} />
               <input
                 type="email"
-                className="w-full border rounded px-3 py-2"
+                placeholder=""
+                className="w-full py-2 outline-none bg-transparent"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
             </div>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">Password</label>
+          {/* Password */}
+          <div>
+            <label className="text-sm text-gray-600">Password</label>
+            <div className="flex items-center border rounded-lg px-3 mt-1 focus-within:ring-2 focus-within:ring-blue-600">
+              <Lock className="text-gray-400 mr-2" size={18} />
               <input
                 type="password"
-                className="w-full border rounded px-3 py-2"
+                placeholder=""
+                className="w-full py-2 outline-none bg-transparent"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
             </div>
+          </div>
 
-            <button
-              type="submit"
-              className="w-full bg-blue-900 text-white py-2 rounded hover:bg-blue-800"
-              disabled={loading}
-            >
-              {loading ? "Signing in..." : "Login"}
-            </button>
-          </form>
-        </div>
+          {/* Login Button */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-900 text-white py-2.5 rounded-lg hover:bg-blue-800 transition flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Signing in...
+              </>
+            ) : (
+              "Login"
+            )}
+          </button>
+
+        </form>
+
+        {/* Footer */}
+        <p className="text-center text-xs text-gray-500 mt-6">
+           Authorized Personnel Only
+        </p>
+
       </div>
     </div>
   );
