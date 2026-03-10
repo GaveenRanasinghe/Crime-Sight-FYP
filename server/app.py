@@ -26,7 +26,6 @@ def internal_error(error):
     return jsonify({"error": "Internal server error"}), 500
 
 
-# ============= Auth Routes =============
 
 @app.route("/api/login", methods=["POST"])
 def login():
