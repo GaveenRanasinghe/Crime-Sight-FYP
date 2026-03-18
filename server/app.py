@@ -15,6 +15,19 @@ CORS(app, supports_credentials=True)
 def bad_request(error):
     return jsonify({"error": "Bad request"}), 400
 
+@app.route("/", methods=["GET"])
+def home():
+    return jsonify({
+        "message": "Crime Prediction API is running 🚀",
+        "status": "success",
+        "available_endpoints": [
+            "/api/health",
+            "/api/districts",
+            "/api/crime-stats",
+            "/api/crime/dashboard-summary",
+            "/api/crime/high-risk-districts"
+        ]
+    }), 200
 
 @app.errorhandler(404)
 def not_found(error):
@@ -88,6 +101,28 @@ def logout(user=None):
 
 # ============= Crime Data Routes =============
 
+@app.route("/api/districts", methods=["GET"])
+def get_districts():
+    """Get all districts - endpoint for crime map frontend."""
+    try:
+        districts = db.get_all_districts()
+        return jsonify(districts), 200
+    except Exception as e:
+        print(f"Error fetching districts: {e}")
+        return jsonify({"error": "Failed to fetch districts"}), 500
+
+
+@app.route("/api/crime-stats", methods=["GET"])
+def get_crime_stats():
+    """Get all crime statistics - endpoint for crime map frontend."""
+    try:
+        data = db.get_all_crime_statistics_with_districts()
+        return jsonify(data), 200
+    except Exception as e:
+        print(f"Error fetching crime stats: {e}")
+        return jsonify({"error": "Failed to fetch crime statistics"}), 500
+
+
 @app.route("/api/crime/districts", methods=["GET"])
 def get_all_districts():
     """Get all districts."""
@@ -149,20 +184,111 @@ def get_dashboard_summary():
     try:
         all_stats = db.get_all_crime_statistics_with_districts()
         districts = db.get_all_districts()
-        
+
+        # ✅ Handle empty DB
+        if not all_stats:
+            return jsonify({
+                "totalDistricts": len(districts) if districts else 0,
+                "totalCrimes": 0,
+                "averageCrimesPerDistrict": 0,
+                "highRiskCount": 0,
+                "districtSummaries": [],
+                "highRiskDistricts": [],
+                "message": "No data available"
+            }), 200
+
+        # ========================
         # Group by district
+        # ========================
         district_map = {}
+
         for item in all_stats:
             crime_stat = item.get("crimeStatistics", item)
             dist = item.get("districts", {})
+
             dist_id = dist.get("id")
-            
+
+            # ❗ Skip if no district id
+            if not dist_id:
+                continue
+
             if dist_id not in district_map:
                 district_map[dist_id] = {
                     "district": dist,
                     "stats": [],
                 }
+
             district_map[dist_id]["stats"].append(crime_stat)
+
+        # ========================
+        # Calculate summaries
+        # ========================
+        district_summaries = []
+
+        for dist_id, data in district_map.items():
+            try:
+                summary = analytics.calculate_district_summary(data["stats"])
+            except Exception as e:
+                print("Summary error:", e)
+                summary = {
+                    "totalCrimes": 0,
+                    "riskLevel": "low"
+                }
+
+            district_summaries.append({
+                "district": data["district"],
+                "summary": summary,
+            })
+
+        # ========================
+        # Sort by risk
+        # ========================
+        risk_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+
+        district_summaries.sort(
+            key=lambda x: risk_order.get(x["summary"].get("riskLevel", "low"), 4)
+        )
+
+        # ========================
+        # High risk filter
+        # ========================
+        high_risk_districts = [
+            d for d in district_summaries
+            if d["summary"].get("riskLevel") in ["high", "critical"]
+        ]
+
+        # ========================
+        # Totals
+        # ========================
+        total_crimes = sum(
+            d["summary"].get("totalCrimes", 0) for d in district_summaries
+        )
+
+        avg = (
+            round(total_crimes / len(district_summaries))
+            if district_summaries else 0
+        )
+
+        # ========================
+        # Response
+        # ========================
+        return jsonify({
+            "totalDistricts": len(districts) if districts else 0,
+            "totalCrimes": total_crimes,
+            "averageCrimesPerDistrict": avg,
+            "highRiskCount": len(high_risk_districts),
+            "districtSummaries": district_summaries,
+            "highRiskDistricts": high_risk_districts,
+        }), 200
+
+    except Exception as e:
+        print("FULL ERROR:", e)
+        traceback.print_exc()
+
+        return jsonify({
+            "error": str(e),
+            "message": "Failed to fetch dashboard summary"
+        }), 500
         
         # Calculate summaries
         district_summaries = []

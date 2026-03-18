@@ -31,5 +31,12 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
+    // 👇 ADD THIS — replace 5000 with your actual Flask port
+    proxy: {
+      "/api": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+      },
+    },
   },
 });
