@@ -5,6 +5,36 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MapPin, AlertCircle, Loader2 } from "lucide-react";
 
+// ── GeoJSON district name → our DB district name mapping ──────────
+// GeoJSON uses Sinhala/Tamil romanized names, DB uses English names
+const GEO_TO_DB_NAME: Record<string, string> = {
+  "Trikuṇāmalaya":  "Trincomalee",
+  "Mulativ":        "Mullaitivu",
+  "Yāpanaya":       "Jaffna",
+  "Kilinŏchchi":    "Kilinochchi",
+  "Mannārama":      "Mannar",
+  "Puttalama":      "Puttalam",
+  "Gampaha":        "Gampaha",
+  "Kŏḷamba":        "Colombo",
+  "Kaḷutara":       "Kalutara",
+  "Gālla":          "Galle",
+  "Mātara":         "Matara",
+  "Hambantŏṭa":     "Hambantota",
+  "Ampāra":         "Ampara",
+  "Maḍakalapuva":   "Batticaloa",
+  "Ratnapura":      "Ratnapura",
+  "Mŏṇarāgala":     "Monaragala",
+  "Kægalla":        "Kegalle",
+  "Badulla":        "Badulla",
+  "Mātale":         "Matale",
+  "Pŏḷŏnnaruva":    "Polonnaruwa",
+  "Kuruṇægala":     "Kurunegala",
+  "Anurādhapura":   "Anuradhapura",
+  "Nuvara Ĕliya":   "Nuwara Eliya",
+  "Vavuniyāva":     "Vavuniya",
+  "Mahanuvara":     "Kandy",
+};
+
 type District = {
   id: number;
   name: string;
@@ -30,6 +60,9 @@ const RISK_COLORS: Record<RiskLevel, string> = {
   low:      "#10b981",
 };
 
+// Sri Lanka district GeoJSON — saved in public folder
+const GEOJSON_URL = "/sri-lanka-districts.json";
+
 export default function CrimeMap() {
   const [districts, setDistricts]       = useState<District[]>([]);
   const [allStats, setAllStats]         = useState<CrimeStat[]>([]);
@@ -37,8 +70,10 @@ export default function CrimeMap() {
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState<string | null>(null);
 
-  const mapRef    = useRef<L.Map | null>(null);
-  const layersRef = useRef<L.CircleMarker[]>([]);
+  const mapRef        = useRef<L.Map | null>(null);
+  const circlesRef    = useRef<L.CircleMarker[]>([]);
+  const geoLayerRef   = useRef<L.GeoJSON | null>(null);
+  const geoJsonData   = useRef<any>(null);
 
   const years = ["2021", "2022", "2023"];
 
@@ -47,20 +82,26 @@ export default function CrimeMap() {
       setLoading(true);
       setError(null);
       try {
-        const dRes = await fetch("/api/districts");
-        if (!dRes.ok) throw new Error(`Districts API failed: ${dRes.status} ${dRes.statusText}`);
+        const [dRes, sRes, gRes] = await Promise.all([
+          fetch("/api/districts"),
+          fetch("/api/crime-stats"),
+          fetch(GEOJSON_URL),
+        ]);
+
+        if (!dRes.ok) throw new Error(`Districts API failed: ${dRes.status}`);
+        if (!sRes.ok) throw new Error(`Crime Stats API failed: ${sRes.status}`);
+        if (!gRes.ok) throw new Error(`GeoJSON failed to load: ${gRes.status}`);
+
         const dData: District[] = await dRes.json();
-        console.log("✅ Districts:", dData);
-        if (!Array.isArray(dData) || dData.length === 0)
-          throw new Error("Districts API returned empty data. Have you run the SQL seed in Supabase?");
-
-        const sRes = await fetch("/api/crime-stats");
-        if (!sRes.ok) throw new Error(`Crime Stats API failed: ${sRes.status} ${sRes.statusText}`);
         const sData: CrimeStat[] = await sRes.json();
-        console.log("✅ Crime Stats:", sData);
-        if (!Array.isArray(sData) || sData.length === 0)
-          throw new Error("Crime Stats API returned empty data. Have you run the SQL seed in Supabase?");
+        const gData = await gRes.json();
 
+        if (!Array.isArray(dData) || dData.length === 0)
+          throw new Error("Districts API returned empty data.");
+        if (!Array.isArray(sData) || sData.length === 0)
+          throw new Error("Crime Stats API returned empty data.");
+
+        geoJsonData.current = gData;
         setDistricts(dData);
         setAllStats(sData);
       } catch (err: any) {
@@ -73,10 +114,10 @@ export default function CrimeMap() {
     fetchData();
   }, []);
 
-  // Redraw circles when year or data changes
+  // Redraw when year or data changes
   useEffect(() => {
     if (mapRef.current && districts.length && allStats.length) {
-      drawMarkers(mapRef.current);
+      drawLayers(mapRef.current);
     }
   }, [selectedYear, districts, allStats]);
 
@@ -95,27 +136,92 @@ export default function CrimeMap() {
       return { district, total, intensity, riskLevel };
     });
 
-  const drawMarkers = (map: L.Map) => {
+  const drawLayers = (map: L.Map) => {
     // Remove old layers
-    layersRef.current.forEach((l) => l.remove());
-    layersRef.current = [];
+    circlesRef.current.forEach((c) => c.remove());
+    circlesRef.current = [];
+    if (geoLayerRef.current) {
+      geoLayerRef.current.remove();
+      geoLayerRef.current = null;
+    }
 
-    getDistrictCrimeData().forEach(({ district, total, intensity, riskLevel }) => {
+    const crimeData = getDistrictCrimeData();
+
+    // Build lookup: DB district name → crime data
+    const districtLookup = new Map(
+      crimeData.map((d) => [d.district.name, d])
+    );
+
+    // ── Draw GeoJSON boundaries ──────────────────────────────────
+    if (geoJsonData.current) {
+      geoLayerRef.current = L.geoJSON(geoJsonData.current, {
+        style: (feature) => {
+          const geoName  = feature?.properties?.name ?? "";
+          const dbName   = GEO_TO_DB_NAME[geoName] ?? geoName;
+          const data     = districtLookup.get(dbName);
+          const color    = data ? RISK_COLORS[data.riskLevel] : "#94a3b8";
+          return {
+            fillColor:   color,
+            fillOpacity: 0.35,
+            color:       color,
+            weight:      2,
+            opacity:     0.8,
+          };
+        },
+        onEachFeature: (feature, layer) => {
+          const geoName = feature?.properties?.name ?? "";
+          const dbName  = GEO_TO_DB_NAME[geoName] ?? geoName;
+          const data    = districtLookup.get(dbName);
+
+          if (data) {
+            const { district, total, intensity, riskLevel } = data;
+            const color = RISK_COLORS[riskLevel];
+            layer.bindTooltip(
+              `<strong>${district.name}</strong>${district.province ? ` · ${district.province}` : ""}`,
+              { sticky: true, className: "district-tooltip" }
+            );
+            layer.bindPopup(`
+              <div style="font-family:sans-serif;min-width:180px">
+                <strong style="font-size:14px">${district.name}</strong>
+                ${district.province ? `<div style="color:#666;font-size:12px">${district.province} Province</div>` : ""}
+                <hr style="margin:6px 0;border-color:#eee"/>
+                <div>Crimes (${selectedYear}): <strong>${total.toLocaleString()}</strong></div>
+                <div>Risk: <strong style="color:${color}">${riskLevel.toUpperCase()}</strong></div>
+                <div>Intensity: ${(intensity * 100).toFixed(0)}%</div>
+              </div>
+            `);
+
+            // Hover highlight
+            layer.on("mouseover", function (this: L.Path) {
+              this.setStyle({ fillOpacity: 0.6, weight: 3 });
+            });
+            layer.on("mouseout", function (this: L.Path) {
+              this.setStyle({ fillOpacity: 0.35, weight: 2 });
+            });
+          } else {
+            layer.bindTooltip(geoName, { sticky: true });
+          }
+        },
+      }).addTo(map);
+    }
+
+    // ── Draw circle markers on top ────────────────────────────────
+    crimeData.forEach(({ district, total, intensity, riskLevel }) => {
       const lat   = Number(district.latitude);
       const lng   = Number(district.longitude);
       const color = RISK_COLORS[riskLevel];
-      const radius = 8 + intensity * 24;
+      const radius = 6 + intensity * 16;
 
       const circle = L.circleMarker([lat, lng], {
         radius,
-        fillColor: color,
-        fillOpacity: 0.75,
-        color: "#ffffff",
-        weight: 2,
+        fillColor:   color,
+        fillOpacity: 0.9,
+        color:       "#fff",
+        weight:      2,
       }).addTo(map);
 
       circle.bindPopup(`
-        <div style="font-family:sans-serif;min-width:160px">
+        <div style="font-family:sans-serif;min-width:180px">
           <strong style="font-size:14px">${district.name}</strong>
           ${district.province ? `<div style="color:#666;font-size:12px">${district.province} Province</div>` : ""}
           <hr style="margin:6px 0;border-color:#eee"/>
@@ -125,14 +231,14 @@ export default function CrimeMap() {
         </div>
       `);
 
-      layersRef.current.push(circle);
+      circlesRef.current.push(circle);
     });
   };
 
   const handleMapReady = (map: L.Map) => {
     mapRef.current = map;
     if (districts.length && allStats.length) {
-      drawMarkers(map);
+      drawLayers(map);
     }
   };
 
@@ -160,14 +266,6 @@ export default function CrimeMap() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-gray-700 text-sm">{error}</p>
-            <div className="bg-gray-50 rounded p-3 text-xs text-gray-500 space-y-1">
-              <p className="font-semibold text-gray-600">Possible causes:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Flask server not running on port 5000</li>
-                <li>Supabase tables not created — run the SQL setup file</li>
-                <li>SUPABASE_URL or SUPABASE_KEY missing in .env</li>
-              </ul>
-            </div>
             <button
               onClick={() => window.location.reload()}
               className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
@@ -197,7 +295,7 @@ export default function CrimeMap() {
               <div>
                 <CardTitle>Crime Distribution Map</CardTitle>
                 <CardDescription>
-                  Circle size and color represent crime intensity. Click a circle for details.
+                  District boundaries colored by risk level. Click or hover for details.
                 </CardDescription>
               </div>
               <Select value={selectedYear} onValueChange={setSelectedYear}>
@@ -219,7 +317,7 @@ export default function CrimeMap() {
         <div className="flex gap-6 mb-6 flex-wrap">
           {(Object.entries(RISK_COLORS) as [RiskLevel, string][]).map(([level, color]) => (
             <div key={level} className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full border-2 border-white shadow" style={{ backgroundColor: color }} />
+              <div className="w-4 h-4 rounded border-2 border-white shadow" style={{ backgroundColor: color }} />
               <span className="text-sm text-gray-600 capitalize font-medium">{level}</span>
             </div>
           ))}
