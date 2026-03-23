@@ -314,8 +314,8 @@ function Navigation({ onSidebarStateChange }: { onSidebarStateChange: (open: boo
           <div className="sidebar-logo-icon">SL</div>
           {sidebarOpen && (
             <div style={{ overflow: "hidden" }}>
-              <div className="sidebar-logo-text">CRIME SIGHT</div>
-              <div className="sidebar-logo-sub">Sri Lanka Police</div>
+              <div className="sidebar-logo-text">SENTINEL</div>
+              <div className="sidebar-logo-sub">Crime Intel Platform</div>
             </div>
           )}
         </div>
@@ -346,7 +346,29 @@ function Navigation({ onSidebarStateChange }: { onSidebarStateChange: (open: boo
 
           <div className="nav-divider" />
 
-          
+          {sidebarOpen && <div className="nav-section-label">Data Layers</div>}
+          <div style={{
+            padding: sidebarOpen ? "0.4rem 0.75rem" : "0.4rem",
+            display: "flex", flexDirection: "column", gap: "0.3rem"
+          }}>
+            {[["25", "Districts"], ["13", "Crime Types"], ["2021–23", "Period"]].map(([val, lbl]) => (
+              <div key={lbl} style={{
+                display: "flex", alignItems: "center",
+                justifyContent: sidebarOpen ? "space-between" : "center",
+                padding: "0.3rem 0",
+                borderBottom: "1px solid rgba(255,107,74,0.05)"
+              }}>
+                {sidebarOpen ? (
+                  <>
+                    <span style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.52rem", color: "#555e6a", letterSpacing: "0.1em", textTransform: "uppercase" }}>{lbl}</span>
+                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "0.95rem", color: "#ff6b4a", lineHeight: 1 }}>{val}</span>
+                  </>
+                ) : (
+                  <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "0.85rem", color: "#ff6b4a", lineHeight: 1 }}>{val.replace("–23", "")}</span>
+                )}
+              </div>
+            ))}
+          </div>
         </nav>
 
         {/* User / Auth */}
@@ -394,18 +416,32 @@ function Navigation({ onSidebarStateChange }: { onSidebarStateChange: (open: boo
 }
 
 function Router({ sidebarOpen }: { sidebarOpen: boolean }) {
+  const { isAuthenticated } = useAuth();
+  const [location] = useLocation();
+
+  // Public routes that don't require auth
+  const isPublicRoute = location === "/auth/login" || location === "/404";
+
+  // Redirect unauthenticated users to login for any non-public route
+  if (!isAuthenticated && !isPublicRoute) {
+    return <LoginPage />;
+  }
+
   return (
     <main
       style={{
-        marginLeft: sidebarOpen ? "220px" : "56px",
+        marginLeft: isPublicRoute ? "0" : sidebarOpen ? "220px" : "56px",
         transition: "margin-left 0.3s cubic-bezier(0.4,0,0.2,1)",
         minHeight: "100vh",
         background: "#0a0c0f",
       }}
     >
       <Switch>
-        <Route path="/" component={Home} />
         <Route path="/auth/login" component={LoginPage} />
+
+        <Route path="/">
+          {() => <ProtectedRoute component={Home} />}
+        </Route>
 
         <Route path="/dashboard">
           {() => <ProtectedRoute component={Dashboard} />}
@@ -428,14 +464,21 @@ function Router({ sidebarOpen }: { sidebarOpen: boolean }) {
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const { isAuthenticated } = useAuth();
+  const [location] = useLocation();
+
+  const isPublicRoute = location === "/auth/login" || location === "/404";
 
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
-          <Navigation onSidebarStateChange={setSidebarOpen} />
-          <Router sidebarOpen={sidebarOpen} />
+          {/* Hide sidebar on login/public pages and when not authenticated */}
+          {isAuthenticated && !isPublicRoute && (
+            <Navigation onSidebarStateChange={setSidebarOpen} />
+          )}
+          <Router sidebarOpen={isAuthenticated && !isPublicRoute ? sidebarOpen : false} />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

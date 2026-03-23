@@ -1,22 +1,18 @@
-import * as XLSX from "xlsx";
 import { useEffect, useState, useMemo } from "react";
-import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/lib/supabase";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
-import { AlertCircle, TrendingUp, TrendingDown, Activity, Printer, Download } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { TrendingUp, TrendingDown, Printer, Download } from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const COLORS = [
-  "#ef4444", "#f97316", "#eab308", "#84cc16", "#22c55e",
-  "#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6", "#f43f5e",
-  "#a855f7", "#06b6d4", "#facc15",
+  "#ef4444","#f97316","#eab308","#84cc16","#22c55e",
+  "#3b82f6","#8b5cf6","#ec4899","#14b8a6","#f43f5e",
+  "#a855f7","#06b6d4","#facc15",
 ];
 
 const RISK_COLORS: Record<string, string> = {
@@ -28,311 +24,264 @@ const RISK_COLORS: Record<string, string> = {
 
 const YEARS = ["2021", "2022", "2023"];
 
-const CRIME_TYPES = [
-  "Rape Cases",
-  "Homicide",
-  "Attempted Homicide",
-  "Abduction",
-  "Kidnapping",
-  "Arson",
-  "Theft over Rs. 50,000",
-  "Grievous Hurt",
-  "Hurt by Knife",
-  "Robbery",
-  "Extortion",
-  "Unnatural Offense",
-  "Sexual Abuse",
-];
+// ALL 13 columns confirmed from CSV export
+const CRIME_TYPE_MAP: Record<string, string> = {
+  "Rape Cases":           "rapeCases",
+  "Homicide":             "homicide",
+  "Attempted Homicide":   "attemptedHomicide",
+  "Abduction":            "abduction",
+  "Kidnapping":           "kidnapping",
+  "Arson":                "arson",
+  "Theft over Rs.50,000": "theftOver50k",
+  "Grievous Hurt":        "grievousHurt",
+  "Hurt by Knife":        "hurtByKnife",
+  "Robbery":              "robbery",
+  "Extortion":            "extortion",
+  "Unnatural Offense":    "unnaturalOffense",
+  "Sexual Abuse":         "sexualAbuse",
+};
+const CRIME_TYPES = Object.keys(CRIME_TYPE_MAP);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface CrimeStatistic {
-  year:              number;
-  districtName:      string;
-  total:             number;
-  rapeCases:         number;
-  homicide:          number;
+interface RawStat {
+  id: number;
+  districtId: number;
+  year: number;
+  total: number;
+  murder: number;
+  rape: number;
+  robbery: number;
+  assault: number;
+  theft: number;
+  drugOffenses: number;
+  rapeCases: number;
+  homicide: number;
   attemptedHomicide: number;
-  abduction:         number;
-  kidnapping:        number;
-  arson:             number;
-  theftOver50k:      number;
-  grievousHurt:      number;
-  hurtByKnife:       number;
-  robbery:           number;
-  extortion:         number;
-  unnaturalOffense:  number;
-  sexualAbuse:       number;
+  abduction: number;
+  kidnapping: number;
+  arson: number;
+  theftOver50k: number;
+  grievousHurt: number;
+  hurtByKnife: number;
+  extortion: number;
+  unnaturalOffense: number;
+  sexualAbuse: number;
+  // Supabase returns joined tables as arrays
+  districts: { id: number; name: string }[] | null;
 }
 
-interface StatItem {
-  crime_statistics: CrimeStatistic;
-}
-
-interface DistrictSummary {
-  totalCrimes:        number;
-  averagePerYear:     number;
-  trend:              string;
-  riskLevel:          string;
-  yearOverYearChange: number;
+interface CrimeStat {
+  year: number;
+  districtId: number;
+  districtName: string;
+  total: number;
+  murder: number;
+  rape: number;
+  robbery: number;
+  assault: number;
+  theft: number;
+  drugOffenses: number;
+  rapeCases: number;
+  homicide: number;
+  attemptedHomicide: number;
+  abduction: number;
+  kidnapping: number;
+  arson: number;
+  theftOver50k: number;
+  grievousHurt: number;
+  hurtByKnife: number;
+  extortion: number;
+  unnaturalOffense: number;
+  sexualAbuse: number;
 }
 
 interface HighRiskDistrict {
-  district: { id: string | number; name: string };
-  summary:  DistrictSummary;
+  district: { id: number; name: string };
+  summary: {
+    totalCrimes: number;
+    averagePerYear: number;
+    trend: string;
+    riskLevel: string;
+    yearOverYearChange: number;
+  };
 }
 
 interface DashboardSummary {
-  totalDistricts:           number;
-  totalCrimes:              number;
+  totalDistricts: number;
+  totalCrimes: number;
   averageCrimesPerDistrict: number;
-  highRiskCount:            number;
-  highRiskDistricts:        HighRiskDistrict[];
+  highRiskCount: number;
+  highRiskDistricts: HighRiskDistrict[];
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// Safe number — NaN becomes 0
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function num(val: any): number {
-  const v = Number(val);
-  return isNaN(v) ? 0 : v;
-}
-
-// Return the first key in `keys` that exists and is non-empty on `row`
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function pick(row: any, keys: string[]): any {
-  for (const k of keys) {
-    const v = row[k];
-    if (v !== undefined && v !== null && v !== "") return v;
-  }
-  return undefined;
-}
-
-function getCrimeCount(stat: CrimeStatistic, type: string): number {
-  const map: Record<string, number> = {
-    "Rape Cases":             stat.rapeCases,
-    "Homicide":               stat.homicide,
-    "Attempted Homicide":     stat.attemptedHomicide,
-    "Abduction":              stat.abduction,
-    "Kidnapping":             stat.kidnapping,
-    "Arson":                  stat.arson,
-    "Theft over Rs. 50,000":  stat.theftOver50k,
-    "Grievous Hurt":          stat.grievousHurt,
-    "Hurt by Knife":          stat.hurtByKnife,
-    "Robbery":                stat.robbery,
-    "Extortion":              stat.extortion,
-    "Unnatural Offense":      stat.unnaturalOffense,
-    "Sexual Abuse":           stat.sexualAbuse,
-  };
-  return map[type] ?? 0;
-}
-
-function getRiskLevel(totalCrimes: number, avg: number): string {
-  if (totalCrimes > avg * 1.5) return "critical";
-  if (totalCrimes > avg * 1.2) return "high";
-  if (totalCrimes > avg * 0.8) return "medium";
+function getRiskLevel(total: number, avg: number): string {
+  if (total > avg * 1.5) return "critical";
+  if (total > avg * 1.2) return "high";
+  if (total > avg * 0.8) return "medium";
   return "low";
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function parseRow(row: any): CrimeStatistic {
-  const rapeCases         = num(pick(row, ["Rape Cases", "rape_cases", "rapeCases", "RAPE CASES"]));
-  const homicide          = num(pick(row, ["Homicide", "homicide", "HOMICIDE"]));
-  const attemptedHomicide = num(pick(row, ["Attempted Homicide", "attempted_homicide", "attemptedHomicide"]));
-  const abduction         = num(pick(row, ["Abduction", "abduction", "ABDUCTION"]));
-  const kidnapping        = num(pick(row, ["Kidnapping", "kidnapping", "KIDNAPPING"]));
-  const arson             = num(pick(row, ["Arson", "arson", "ARSON"]));
-  const theftOver50k      = num(pick(row, ["Theft over Rs. 50,000", "Theft Over Rs. 50,000", "Theft over Rs.50,000", "theft_over_50k", "theftOver50k"]));
-  const grievousHurt      = num(pick(row, ["Grievous Hurt", "grievous_hurt", "grievousHurt", "GRIEVOUS HURT"]));
-  const hurtByKnife       = num(pick(row, ["Hurt by Knife", "hurt_by_knife", "hurtByKnife", "HURT BY KNIFE"]));
-  const robbery           = num(pick(row, ["Robbery", "robbery", "ROBBERY"]));
-  const extortion         = num(pick(row, ["Extortion", "extortion", "EXTORTION"]));
-  const unnaturalOffense  = num(pick(row, ["Unnatural Offense", "unnatural_offense", "unnaturalOffense", "UNNATURAL OFFENSE"]));
-  const sexualAbuse       = num(pick(row, ["Sexual Abuse", "sexual_abuse", "sexualAbuse", "SEXUAL ABUSE"]));
-
-  const sumOfParts =
-    rapeCases + homicide + attemptedHomicide + abduction +
-    kidnapping + arson + theftOver50k + grievousHurt +
-    hurtByKnife + robbery + extortion + unnaturalOffense + sexualAbuse;
-
-  const explicitTotal = num(pick(row, ["Total", "total", "TOTAL", "Total Crimes", "total_crimes"]));
-  const total = explicitTotal > 0 ? explicitTotal : sumOfParts;
-
-  return {
-    year:         num(pick(row, ["Year", "year", "YEAR"])),
-    districtName: String(pick(row, ["District", "district", "District Name", "district_name", "districtName", "DISTRICT"]) ?? ""),
-    total,
-    rapeCases, homicide, attemptedHomicide, abduction,
-    kidnapping, arson, theftOver50k, grievousHurt,
-    hurtByKnife, robbery, extortion, unnaturalOffense, sexualAbuse,
-  };
+function getCrimeCount(stat: CrimeStat, type: string): number {
+  const col = CRIME_TYPE_MAP[type];
+  return col ? (stat as any)[col] ?? 0 : 0;
 }
+
+// ─── Custom Tooltip ───────────────────────────────────────────────────────────
+
+const SentinelTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={{ background: "#ffffff", border: "1px solid #e5e7eb", padding: "0.6rem 0.875rem", fontFamily: "'Space Mono',monospace", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
+      {label && <div style={{ fontSize: "0.55rem", color: "#ff6b4a", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.4rem" }}>{label}</div>}
+      {payload.map((p: any, i: number) => (
+        <div key={i} style={{ fontSize: "0.65rem", color: "#111", letterSpacing: "0.06em" }}>
+          <span style={{ color: p.color, marginRight: "0.3rem" }}>■</span>
+          {p.name}: <strong>{typeof p.value === "number" ? p.value.toLocaleString() : p.value}</strong>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const crimeRouter = (trpc as any).crime;
-  const {
-    data: apiSummary,
-    isLoading: summaryLoading,
-  }: { data: DashboardSummary | undefined; isLoading: boolean } =
-    crimeRouter.getDashboardSummary.useQuery();
+  const [stats, setStats]     = useState<CrimeStat[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
+  const [selectedYear, setSelectedYear]           = useState("2023");
+  const [selectedCrimeType, setSelectedCrimeType] = useState("Robbery");
 
-  const [allStats, setAllStats]         = useState<StatItem[]>([]);
-  const [excelLoading, setExcelLoading] = useState(true);
-  const [selectedYear, setSelectedYear] = useState<string>("2023");
-  const [selectedCrimeType, setSelectedCrimeType] = useState<string>("Robbery");
-
-  // ── Load Excel ──────────────────────────────────────────────────────────────
+  // ── Fetch from Supabase ──────────────────────────────────────────────────
   useEffect(() => {
-    const loadExcel = async () => {
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const res = await fetch("/crime_data.xlsx");
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const { data, error: err } = await supabase
+          .from("crimeStatistics")
+          .select(`
+            id, districtId, year, total,
+            murder, rape, robbery, assault, theft, drugOffenses,
+            rapeCases, homicide, attemptedHomicide, abduction, kidnapping,
+            arson, theftOver50k, grievousHurt, hurtByKnife,
+            extortion, unnaturalOffense, sexualAbuse,
+            districts ( id, name )
+          `)
+          .order("year", { ascending: true });
 
-        const buffer   = await res.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: "array" });
-        const sheet    = workbook.Sheets[workbook.SheetNames[0]];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data: any[] = XLSX.utils.sheet_to_json(sheet);
+        if (err) throw new Error(err.message);
 
-        if (data.length > 0) {
-          console.log("[Dashboard] Column names:", Object.keys(data[0]));
-          console.log("[Dashboard] First row raw:", data[0]);
-        }
+        const mapped: CrimeStat[] = (data as unknown as RawStat[]).map((row) => ({
+          year:              row.year,
+          districtId:        row.districtId,
+          districtName:      (Array.isArray(row.districts) ? row.districts[0]?.name : (row.districts as any)?.name) ?? `District ${row.districtId}`,
+          total:             row.total             ?? 0,
+          murder:            row.murder            ?? 0,
+          rape:              row.rape              ?? 0,
+          robbery:           row.robbery           ?? 0,
+          assault:           row.assault           ?? 0,
+          theft:             row.theft             ?? 0,
+          drugOffenses:      row.drugOffenses      ?? 0,
+          rapeCases:         row.rapeCases         ?? 0,
+          homicide:          row.homicide          ?? 0,
+          attemptedHomicide: row.attemptedHomicide ?? 0,
+          abduction:         row.abduction         ?? 0,
+          kidnapping:        row.kidnapping        ?? 0,
+          arson:             row.arson             ?? 0,
+          theftOver50k:      row.theftOver50k      ?? 0,
+          grievousHurt:      row.grievousHurt      ?? 0,
+          hurtByKnife:       row.hurtByKnife       ?? 0,
+          extortion:         row.extortion         ?? 0,
+          unnaturalOffense:  row.unnaturalOffense  ?? 0,
+          sexualAbuse:       row.sexualAbuse       ?? 0,
+        }));
 
-        const formatted = data.map((row) => ({ crime_statistics: parseRow(row) }));
-
-        console.log("[Dashboard] Rows parsed:", formatted.length);
-        if (formatted.length > 0) {
-          console.log("[Dashboard] First row parsed:", formatted[0].crime_statistics);
-        }
-
-        setAllStats(formatted);
-      } catch (err) {
-        console.error("[Dashboard] Excel error:", err);
+        setStats(mapped);
+      } catch (e: any) {
+        setError(e.message ?? "Failed to load data");
       } finally {
-        setExcelLoading(false);
+        setLoading(false);
       }
     };
-    loadExcel();
+    loadData();
   }, []);
 
-  // ── localSummary derived from Excel data ────────────────────────────────────
-  const localSummary = useMemo<DashboardSummary | null>(() => {
-    if (!allStats.length) return null;
+  // ── Derived summary ──────────────────────────────────────────────────────
+  const summary = useMemo((): DashboardSummary | null => {
+    if (!stats.length) return null;
 
-    const districtNames = Array.from(
-      new Set(
-        allStats
-          .map((i) => i.crime_statistics.districtName)
-          .filter((d): d is string => Boolean(d))
-      )
-    );
-
-    const totalDistricts = districtNames.length || apiSummary?.totalDistricts || 25;
-    const totalCrimes    = allStats.reduce((s, i) => s + i.crime_statistics.total, 0);
+    const districtNames  = Array.from(new Set(stats.map((s) => s.districtName)));
+    const totalDistricts = districtNames.length;
+    const totalCrimes    = stats.reduce((s, r) => s + r.total, 0);
     const avgPerDistrict = totalDistricts > 0 ? Math.round(totalCrimes / totalDistricts) : 0;
 
-    let highRiskDistricts: HighRiskDistrict[] = [];
+    const districtTotals = districtNames.map((name) => {
+      const rows  = stats.filter((r) => r.districtName === name);
+      const total = rows.reduce((s, r) => s + r.total, 0);
+      const byYear = YEARS.map((y) =>
+        rows.filter((r) => String(r.year) === y).reduce((s, r) => s + r.total, 0)
+      );
+      const prev = byYear[byYear.length - 2] ?? 0;
+      const last = byYear[byYear.length - 1] ?? 0;
+      const yoy  = prev > 0 ? Math.round(((last - prev) / prev) * 1000) / 10 : 0;
+      return {
+        name,
+        total,
+        yoy,
+        trend:      yoy > 2 ? "increasing" : yoy < -2 ? "decreasing" : "stable",
+        risk:       getRiskLevel(total, avgPerDistrict),
+        avgPerYear: Math.round(total / YEARS.length),
+      };
+    });
 
-    if (districtNames.length > 0) {
-      const districtTotals = districtNames.map((name) => {
-        const rows = allStats.filter((i) => i.crime_statistics.districtName === name);
-        const total = rows.reduce((s, r) => s + r.crime_statistics.total, 0);
+    const highRiskDistricts: HighRiskDistrict[] = districtTotals
+      .filter((d) => d.risk === "high" || d.risk === "critical")
+      .sort((a, b) => b.total - a.total)
+      .map((d, idx) => ({
+        district: { id: idx, name: d.name },
+        summary:  {
+          totalCrimes:        d.total,
+          averagePerYear:     d.avgPerYear,
+          trend:              d.trend,
+          riskLevel:          d.risk,
+          yearOverYearChange: d.yoy,
+        },
+      }));
 
-        const sortedYears = Array.from(
-          new Set(rows.map((r) => r.crime_statistics.year))
-        ).sort((a, b) => a - b) as number[];
+    return { totalDistricts, totalCrimes, averageCrimesPerDistrict: avgPerDistrict, highRiskCount: highRiskDistricts.length, highRiskDistricts };
+  }, [stats]);
 
-        const lastTwo = sortedYears.slice(-2);
-        const prev = rows.filter((r) => r.crime_statistics.year === lastTwo[0]).reduce((s, r) => s + r.crime_statistics.total, 0);
-        const last = rows.filter((r) => r.crime_statistics.year === lastTwo[1]).reduce((s, r) => s + r.crime_statistics.total, 0);
-        const yoy  = prev > 0 ? Math.round(((last - prev) / prev) * 1000) / 10 : 0;
-
-        return {
-          name,
-          total,
-          yoy,
-          trend:      yoy > 2 ? "increasing" : yoy < -2 ? "decreasing" : "stable",
-          risk:       getRiskLevel(total, avgPerDistrict),
-          avgPerYear: Math.round(total / (sortedYears.length || 1)),
-        };
-      });
-
-      highRiskDistricts = districtTotals
-        .filter((d) => d.risk === "high" || d.risk === "critical")
-        .sort((a, b) => b.total - a.total)
-        .map((d, idx) => ({
-          district: { id: idx, name: d.name },
-          summary: {
-            totalCrimes:        d.total,
-            averagePerYear:     d.avgPerYear,
-            trend:              d.trend,
-            riskLevel:          d.risk,
-            yearOverYearChange: d.yoy,
-          },
-        }));
-    } else {
-      highRiskDistricts = apiSummary?.highRiskDistricts ?? [];
-    }
-
-    return {
-      totalDistricts,
-      totalCrimes,
-      averageCrimesPerDistrict: avgPerDistrict,
-      highRiskCount: highRiskDistricts.length,
-      highRiskDistricts,
-    };
-  }, [allStats, apiSummary]);
-
-  const summary = localSummary ?? apiSummary;
-
-  // ── Chart data (memoised) ───────────────────────────────────────────────────
-
+  // ── Chart data ───────────────────────────────────────────────────────────
   const yearData = useMemo(() =>
     YEARS.map((year) => {
-      const yr    = parseInt(year, 10);
-      const rows  = allStats.filter((i) => i.crime_statistics.year === yr);
-      const total = rows.reduce((s, i) => s + i.crime_statistics.total, 0);
+      const rows  = stats.filter((r) => String(r.year) === year);
+      const total = rows.reduce((s, r) => s + r.total, 0);
       return { year, total, average: rows.length > 0 ? Math.round(total / rows.length) : 0 };
-    }),
-    [allStats]
-  );
+    }), [stats]);
 
   const crimeTypeData = useMemo(() => {
-    const yr   = parseInt(selectedYear, 10);
-    const rows = allStats.filter((i) => i.crime_statistics.year === yr);
+    const rows = stats.filter((r) => String(r.year) === selectedYear);
     return CRIME_TYPES
-      .map((type) => ({
-        name:  type,
-        value: rows.reduce((s, i) => s + getCrimeCount(i.crime_statistics, type), 0),
-      }))
+      .map((type) => ({ name: type, value: rows.reduce((s, r) => s + getCrimeCount(r, type), 0) }))
       .filter((d) => d.value > 0);
-  }, [allStats, selectedYear]);
+  }, [stats, selectedYear]);
 
   const trendData = useMemo(() =>
     YEARS.map((year) => {
-      const yr   = parseInt(year, 10);
-      const rows = allStats.filter((i) => i.crime_statistics.year === yr);
-      return {
-        year,
-        count: rows.reduce((s, i) => s + getCrimeCount(i.crime_statistics, selectedCrimeType), 0),
-      };
-    }),
-    [allStats, selectedCrimeType]
-  );
+      const rows = stats.filter((r) => String(r.year) === year);
+      return { year, count: rows.reduce((s, r) => s + getCrimeCount(r, selectedCrimeType), 0) };
+    }), [stats, selectedCrimeType]);
 
-  // ── Export helpers ──────────────────────────────────────────────────────────
-
+  // ── Export ───────────────────────────────────────────────────────────────
   const handlePrint = () => window.print();
-
   const handleExportCSV = () => {
     if (!summary?.highRiskDistricts?.length) return;
     let csv = "District,Total Crimes,Average per Year,Trend,Risk Level,YoY Change\n";
-    summary.highRiskDistricts.forEach((item: HighRiskDistrict) => {
+    summary.highRiskDistricts.forEach((item) => {
       csv += `"${item.district.name}",${item.summary.totalCrimes},${item.summary.averagePerYear},"${item.summary.trend}","${item.summary.riskLevel}",${item.summary.yearOverYearChange}\n`;
     });
     const el = document.createElement("a");
@@ -344,266 +293,301 @@ export default function Dashboard() {
     document.body.removeChild(el);
   };
 
-  // ── Loading ─────────────────────────────────────────────────────────────────
-
-  if (excelLoading && summaryLoading) {
+  // ── Loading ──────────────────────────────────────────────────────────────
+  if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Activity className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-gray-600">Loading dashboard...</p>
+      <div style={{ minHeight: "100vh", background: "#0a0c0f", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "1rem" }}>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ff6b4a" strokeWidth="1.5" style={{ animation: "spin 1s linear infinite" }}>
+          <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+        </svg>
+        <p style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.65rem", letterSpacing: "0.16em", color: "#555e6a", textTransform: "uppercase" }}>
+          Loading intelligence data...
+        </p>
+      </div>
+    );
+  }
+
+  // ── Error ────────────────────────────────────────────────────────────────
+  if (error) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0a0c0f", display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
+        <div style={{ background: "#0d1117", border: "1px solid rgba(220,38,38,0.3)", padding: "2rem", maxWidth: 480, width: "100%", position: "relative" }}>
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "#dc2626" }} />
+          <p style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.62rem", color: "#f87171", letterSpacing: "0.08em", marginBottom: "1rem" }}>
+            DATA LOAD FAILURE: {error}
+          </p>
+          <button onClick={() => window.location.reload()} style={{ background: "#ff6b4a", color: "#0a0c0f", border: "none", fontFamily: "'Space Mono',monospace", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase", padding: "0.65rem 1.25rem", cursor: "pointer" }}>
+            Retry Connection
+          </button>
         </div>
       </div>
     );
   }
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Render ───────────────────────────────────────────────────────────────
+  const axisStyle = { fontFamily: "'Space Mono',monospace", fontSize: "0.55rem", fill: "#555e6a" };
+  const gridStyle = { stroke: "rgba(255,107,74,0.06)", strokeDasharray: "4 4" };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+    <div style={{ minHeight: "100vh", background: "#0a0c0f", padding: "2rem", fontFamily: "'Inter',sans-serif" }}>
       <style>{`
-        @media print {
-          body { background: white; }
-          .no-print { display: none !important; }
-          .max-w-7xl { max-width: 100%; }
-          .grid { page-break-inside: avoid; }
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&family=Inter:wght@300;400;500;600&display=swap');
+        @keyframes spin{to{transform:rotate(360deg)}}
+        @media print{body{background:white;}.no-print{display:none!important;}}
+
+        .db-card{background:#0d1117;border:1px solid rgba(255,107,74,0.12);position:relative;overflow:hidden;border-radius:0;}
+        .db-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#ff6b4a,rgba(255,107,74,0.15),transparent);}
+        .db-card-corner{position:absolute;top:0;right:0;width:16px;height:16px;border-top:1.5px solid #ff6b4a;border-right:1.5px solid #ff6b4a;}
+
+        .db-section-label{font-family:'Space Mono',monospace;font-size:0.52rem;letter-spacing:0.18em;color:#ff6b4a;text-transform:uppercase;margin-bottom:0.5rem;}
+        .db-section-title{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;color:#fff;letter-spacing:0.04em;line-height:1;}
+        .db-section-sub{font-family:'Space Mono',monospace;font-size:0.55rem;color:#555e6a;letter-spacing:0.08em;margin-top:0.25rem;}
+
+        .stat-card{background:#0d1117;border:1px solid rgba(255,107,74,0.12);padding:1.25rem 1.5rem;position:relative;overflow:hidden;}
+        .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#ff6b4a,transparent);}
+        .stat-card-label{font-family:'Space Mono',monospace;font-size:0.68rem;letter-spacing:0.14em;color:#8b949e;text-transform:uppercase;margin-bottom:0.5rem;}
+        .stat-card-val{font-family:'Bebas Neue',sans-serif;font-size:3.2rem;line-height:1;color:#fff;margin-bottom:0.3rem;}
+        .stat-card-val.red{color:#dc2626;}
+        .stat-card-sub{font-family:'Space Mono',monospace;font-size:0.62rem;color:#555e6a;letter-spacing:0.1em;text-transform:uppercase;}
+
+        .alert-sentinel{background:rgba(220,38,38,0.07);border:1px solid rgba(220,38,38,0.22);padding:0.875rem 1.25rem;display:flex;align-items:flex-start;gap:0.6rem;}
+        .alert-sentinel-text{font-family:'Space Mono',monospace;font-size:0.62rem;color:#f87171;letter-spacing:0.04em;line-height:1.6;}
+
+        .db-btn{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.6rem 1.1rem;cursor:pointer;border:none;display:flex;align-items:center;gap:0.4rem;transition:all 0.15s;}
+        .db-btn-outline{background:transparent;border:1px solid rgba(255,107,74,0.25)!important;color:#ff6b4a;}
+        .db-btn-outline:hover{background:rgba(255,107,74,0.08);border-color:rgba(255,107,74,0.5)!important;}
+        .db-btn-solid{background:#ff6b4a;color:#0a0c0f;}
+        .db-btn-solid:hover{background:#ff8c74;}
+
+        .table-wrap{background:#0d1117;border:1px solid rgba(255,107,74,0.12);}
+        .db-table{width:100%;border-collapse:collapse;}
+        .db-thead{background:#111418;}
+        .db-th{font-family:'Space Mono',monospace;font-size:0.5rem;letter-spacing:0.14em;text-transform:uppercase;color:#555e6a;padding:0.875rem 1rem;text-align:left;border-bottom:1px solid rgba(255,107,74,0.1);}
+        .db-tr{border-bottom:1px solid rgba(255,107,74,0.05);transition:background 0.15s;}
+        .db-tr:hover{background:rgba(255,107,74,0.03);}
+        .db-tr:last-child{border-bottom:none;}
+        .db-td{padding:0.75rem 1rem;font-size:0.82rem;color:#8b949e;}
+        .db-td.name{color:#e2e8f0;font-weight:600;display:flex;align-items:center;gap:0.5rem;}
+        .db-td.num{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:#e2e8f0;letter-spacing:0.04em;}
+        .risk-pill{font-family:'Space Mono',monospace;font-size:0.5rem;font-weight:700;letter-spacing:0.1em;padding:0.18rem 0.5rem;text-transform:uppercase;color:#0a0c0f;}
+        .trend-cell{display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;}
+        .yoy-pos{font-family:'Space Mono',monospace;font-size:0.65rem;color:#dc2626;font-weight:700;}
+        .yoy-neg{font-family:'Space Mono',monospace;font-size:0.65rem;color:#10b981;font-weight:700;}
       `}</style>
 
-      <div className="max-w-7xl mx-auto">
+      <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
 
         {/* Header */}
-        <div className="mb-8 flex justify-between items-start no-print">
+        <div className="no-print" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "2rem", flexWrap: "wrap", gap: "1rem" }}>
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Crime Analytics Dashboard</h1>
-            <p className="text-gray-600">Sri Lanka District-Level Crime Statistics (2021-2023)</p>
+            <div className="db-section-label">Analytics Command</div>
+            <h1 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "clamp(2rem,4vw,3rem)", color: "#fff", letterSpacing: "0.04em", lineHeight: 0.95, marginBottom: "0.4rem" }}>
+              Crime Analytics <span style={{ color: "#ff6b4a" }}>Dashboard</span>
+            </h1>
+            <p style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.58rem", color: "#555e6a", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+              Sri Lanka District-Level Crime Statistics · 2021–2023
+            </p>
           </div>
-          <div className="flex gap-3">
-            <Button onClick={handleExportCSV} className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2" size="lg">
-              <Download className="w-4 h-4" /> Export CSV
-            </Button>
-            <Button onClick={handlePrint} className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2" size="lg">
-              <Printer className="w-4 h-4" /> Print Report
-            </Button>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button className="db-btn db-btn-outline" onClick={handleExportCSV}><Download size={12} /> Export CSV</button>
+            <button className="db-btn db-btn-solid"  onClick={handlePrint}><Printer size={12} /> Print Report</button>
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Districts</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">{summary?.totalDistricts ?? 0}</div>
-              <p className="text-xs text-gray-500 mt-1">Monitored districts</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Crimes (3 Years)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">{summary?.totalCrimes?.toLocaleString() ?? 0}</div>
-              <p className="text-xs text-gray-500 mt-1">All crime types</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Average per District</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">{summary?.averageCrimesPerDistrict?.toLocaleString() ?? 0}</div>
-              <p className="text-xs text-gray-500 mt-1">Per district total</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">High-Risk Districts</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-red-600">{summary?.highRiskCount ?? 0}</div>
-              <p className="text-xs text-gray-500 mt-1">Require attention</p>
-            </CardContent>
-          </Card>
+        {/* Stat cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
+          {[
+            { label: "Total Districts",      val: summary?.totalDistricts ?? 0,                              sub: "Monitored sectors",  cls: "" },
+            { label: "Total Crimes (3 Yrs)", val: (summary?.totalCrimes ?? 0).toLocaleString(),              sub: "All crime types",    cls: "" },
+            { label: "Avg per District",     val: (summary?.averageCrimesPerDistrict ?? 0).toLocaleString(), sub: "Per district total", cls: "" },
+            { label: "High-Risk Districts",  val: summary?.highRiskCount ?? 0,                               sub: "Require attention",  cls: "red" },
+          ].map(({ label, val, sub, cls }) => (
+            <div className="stat-card" key={label}>
+              <div className="stat-card-label">{label}</div>
+              <div className={`stat-card-val ${cls}`}>{val}</div>
+              <div className="stat-card-sub">{sub}</div>
+            </div>
+          ))}
         </div>
 
-        {/* High-Risk Alert */}
+        {/* Alert */}
         {summary?.highRiskDistricts && summary.highRiskDistricts.length > 0 && (
-          <Alert className="mb-8 border-red-200 bg-red-50">
-            <AlertCircle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-800">
-              <strong>{summary.highRiskDistricts.length} districts</strong> identified as high-risk or critical:{" "}
-              {summary.highRiskDistricts.slice(0, 3).map((d: HighRiskDistrict) => d.district.name).join(", ")}
+          <div className="alert-sentinel no-print" style={{ marginBottom: "1.5rem" }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" style={{ flexShrink: 0, marginTop: 1 }}>
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <p className="alert-sentinel-text">
+              <strong style={{ color: "#fff" }}>{summary.highRiskDistricts.length} districts</strong> identified as high-risk or critical:{" "}
+              {summary.highRiskDistricts.slice(0, 3).map((d) => d.district.name).join(", ")}
               {summary.highRiskDistricts.length > 3 && ` and ${summary.highRiskDistricts.length - 3} more`}
-            </AlertDescription>
-          </Alert>
+            </p>
+          </div>
         )}
 
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Charts row */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
 
-          {/* Line Chart — Year-over-year trend */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Crime Trend (2021–2023)</CardTitle>
-              <CardDescription>Total crimes by year across all districts</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+          {/* Line chart */}
+          <div className="db-card" style={{ padding: "1.5rem" }}>
+            <div className="db-card-corner" />
+            <div className="db-section-label">Year-over-Year</div>
+            <div className="db-section-title">Crime Trend</div>
+            <div className="db-section-sub">Total crimes by year across all districts</div>
+            <div style={{ marginTop: "1.25rem" }}>
+              <ResponsiveContainer width="100%" height={260}>
                 <LineChart data={yearData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="year" />
-                  <YAxis tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} />
-                  <Tooltip formatter={(v: number) => v.toLocaleString()} />
-                  <Legend />
-                  <Line type="monotone" dataKey="total"   stroke="#3b82f6" strokeWidth={2} name="Total Crimes"         dot={{ r: 5 }} activeDot={{ r: 7 }} />
-                  <Line type="monotone" dataKey="average" stroke="#8b5cf6" strokeWidth={2} name="Average per District" dot={{ r: 5 }} activeDot={{ r: 7 }} />
+                  <CartesianGrid {...gridStyle} />
+                  <XAxis dataKey="year" tick={axisStyle} axisLine={false} tickLine={false} />
+                  <YAxis tick={axisStyle} axisLine={false} tickLine={false}
+                    tickFormatter={(v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} />
+                  <Tooltip content={<SentinelTooltip />} />
+                  <Legend wrapperStyle={{ fontFamily: "'Space Mono',monospace", fontSize: "0.55rem", color: "#8b949e" }} />
+                  <Line type="monotone" dataKey="total"   stroke="#ff6b4a" strokeWidth={2} name="Total Crimes"         dot={{ fill: "#ff6b4a", r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="average" stroke="#38bdf8" strokeWidth={2} name="Average per District" dot={{ fill: "#38bdf8", r: 4 }} activeDot={{ r: 6 }} strokeDasharray="4 2" />
                 </LineChart>
               </ResponsiveContainer>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          {/* Pie Chart — Crime type distribution */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Crime Type Distribution</CardTitle>
-              <CardDescription>
-                <Select value={selectedYear} onValueChange={setSelectedYear}>
-                  <SelectTrigger className="w-32 h-8 text-xs mt-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {YEARS.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {crimeTypeData.length === 0 ? (
-                <div className="flex items-center justify-center h-[350px] text-gray-400 text-sm">
-                  No data for {selectedYear}
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height={350}>
-                  <PieChart>
-                    <Pie
-                      data={crimeTypeData}
-                      cx="35%" cy="50%"
-                      labelLine
-                      label={({ percent }: { percent: number }) => `${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      dataKey="value"
-                    >
-                      {crimeTypeData.map((_entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(v: number) => v.toLocaleString()} />
-                    <Legend
-                      layout="vertical" align="right" verticalAlign="middle"
-                      wrapperStyle={{ paddingLeft: "10px", fontSize: "12px" }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
+          {/* Pie chart */}
+          <div className="db-card" style={{ padding: "1.5rem" }}>
+            <div className="db-card-corner" />
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "1rem" }}>
+              <div>
+                <div className="db-section-label">Distribution</div>
+                <div className="db-section-title">Crime Type Breakdown</div>
+              </div>
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger style={{ width: 90, background: "#0a0c0f", border: "1px solid rgba(255,107,74,0.2)", borderRadius: 0, color: "#e2e8f0", fontFamily: "'Space Mono',monospace", fontSize: "0.65rem" }}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-[9999]">
+                  {YEARS.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            {crimeTypeData.length === 0 ? (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 280, fontFamily: "'Space Mono',monospace", fontSize: "0.62rem", color: "#3d444d", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                No data for {selectedYear}
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={380}>
+                <PieChart>
+                  <Pie
+                    data={crimeTypeData}
+                    cx="38%" cy="50%"
+                    outerRadius={110}
+                    dataKey="value"
+                    label={({ percent }: { percent: number }) => `${(percent * 100).toFixed(0)}%`}
+                    labelLine={{ stroke: "rgba(255,107,74,0.3)" }}
+                  >
+                    {crimeTypeData.map((_e, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip content={<SentinelTooltip />} />
+                  <Legend
+                    layout="vertical" align="right" verticalAlign="middle"
+                    formatter={(value) => (
+                      <span style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.52rem", color: "#8b949e", letterSpacing: "0.04em" }}>{value}</span>
+                    )}
+                    wrapperStyle={{ paddingLeft: 16, lineHeight: "22px" }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </div>
 
-        {/* Bar Chart — Crime trend analysis */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Crime Trend Analysis</CardTitle>
-            <CardDescription>
-              <div className="flex gap-4 mt-2">
-                <Select value={selectedCrimeType} onValueChange={setSelectedCrimeType}>
-                  <SelectTrigger className="w-52 h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CRIME_TYPES.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="year" />
-                <YAxis tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} />
-                <Tooltip formatter={(v: number) => v.toLocaleString()} />
-                <Bar dataKey="count" fill="#3b82f6" name={selectedCrimeType} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Bar chart */}
+        <div className="db-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
+          <div className="db-card-corner" />
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+            <div>
+              <div className="db-section-label">Trend Analysis</div>
+              <div className="db-section-title">Crime Trend Analysis</div>
+            </div>
+            <Select value={selectedCrimeType} onValueChange={setSelectedCrimeType}>
+              <SelectTrigger style={{ width: 220, background: "#0a0c0f", border: "1px solid rgba(255,107,74,0.2)", borderRadius: 0, color: "#e2e8f0", fontFamily: "'Space Mono',monospace", fontSize: "0.65rem" }}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="z-[9999]">
+                {CRIME_TYPES.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={trendData}>
+              <CartesianGrid {...gridStyle} />
+              <XAxis dataKey="year" tick={axisStyle} axisLine={false} tickLine={false} />
+              <YAxis tick={axisStyle} axisLine={false} tickLine={false}
+                tickFormatter={(v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} />
+              <Tooltip content={<SentinelTooltip />} />
+              <Bar dataKey="count" name={selectedCrimeType} fill="#38bdf8" radius={[2,2,0,0]}
+                background={{ fill: "rgba(255,107,74,0.04)" }} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
 
-        {/* High-Risk Districts Table */}
+        {/* High-risk districts table */}
         {summary?.highRiskDistricts && summary.highRiskDistricts.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>High-Risk Districts</CardTitle>
-              <CardDescription>Districts with critical or high crime risk levels</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="border-b bg-gray-50">
-                    <tr>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700">District</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Total Crimes</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Avg / Year</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Trend</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Risk Level</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700">YoY Change</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summary.highRiskDistricts.map((item: HighRiskDistrict) => (
-                      <tr key={item.district.id} className="border-b hover:bg-gray-50 transition-colors">
-                        <td className="py-3 px-4 font-medium">{item.district.name}</td>
-                        <td className="py-3 px-4">{item.summary.totalCrimes.toLocaleString()}</td>
-                        <td className="py-3 px-4">{item.summary.averagePerYear.toLocaleString()}</td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-1">
-                            {item.summary.trend === "increasing" ? (
-                              <TrendingUp className="w-4 h-4 text-red-600" />
-                            ) : item.summary.trend === "decreasing" ? (
-                              <TrendingDown className="w-4 h-4 text-green-600" />
-                            ) : (
-                              <span className="text-gray-400 font-bold">→</span>
-                            )}
-                            <span className="capitalize">{item.summary.trend}</span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span
-                            className="px-2 py-1 rounded text-white text-xs font-semibold"
-                            style={{ backgroundColor: RISK_COLORS[item.summary.riskLevel] ?? "#6b7280" }}
-                          >
-                            {item.summary.riskLevel.toUpperCase()}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className={item.summary.yearOverYearChange > 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>
-                            {item.summary.yearOverYearChange > 0 ? "+" : ""}
-                            {item.summary.yearOverYearChange.toFixed(1)}%
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+              <div>
+                <div className="db-section-label">Threat Assessment</div>
+                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "1.6rem", color: "#fff", letterSpacing: "0.04em" }}>
+                  High-Risk Districts
+                </div>
               </div>
-            </CardContent>
-          </Card>
+              <button className="db-btn db-btn-outline" onClick={handleExportCSV}><Download size={11} /> Export Data</button>
+            </div>
+            <div className="table-wrap">
+              <table className="db-table">
+                <thead className="db-thead">
+                  <tr>
+                    <th className="db-th">District</th>
+                    <th className="db-th">Total Crimes</th>
+                    <th className="db-th">Avg / Year</th>
+                    <th className="db-th">Trend</th>
+                    <th className="db-th">Risk Level</th>
+                    <th className="db-th">YoY Change</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.highRiskDistricts.map((item) => (
+                    <tr key={item.district.id} className="db-tr">
+                      <td className="db-td name">
+                        <div style={{ width: 6, height: 6, borderRadius: "50%", background: RISK_COLORS[item.summary.riskLevel] ?? "#6b7280", flexShrink: 0 }} />
+                        {item.district.name}
+                      </td>
+                      <td className="db-td num">{item.summary.totalCrimes.toLocaleString()}</td>
+                      <td className="db-td num">{item.summary.averagePerYear.toLocaleString()}</td>
+                      <td className="db-td">
+                        <div className="trend-cell" style={{ color: item.summary.trend === "increasing" ? "#dc2626" : item.summary.trend === "decreasing" ? "#10b981" : "#8b949e" }}>
+                          {item.summary.trend === "increasing" ? <TrendingUp size={13} /> : item.summary.trend === "decreasing" ? <TrendingDown size={13} /> : <span style={{ fontWeight: 700 }}>→</span>}
+                          <span style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.6rem", letterSpacing: "0.06em", textTransform: "capitalize" }}>{item.summary.trend}</span>
+                        </div>
+                      </td>
+                      <td className="db-td">
+                        <span className="risk-pill" style={{ background: RISK_COLORS[item.summary.riskLevel] ?? "#6b7280" }}>
+                          {item.summary.riskLevel.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="db-td">
+                        <span className={item.summary.yearOverYearChange > 0 ? "yoy-pos" : "yoy-neg"}>
+                          {item.summary.yearOverYearChange > 0 ? "+" : ""}{item.summary.yearOverYearChange.toFixed(1)}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ padding: "0.65rem 1rem", borderTop: "1px solid rgba(255,107,74,0.06)", background: "#111418", fontFamily: "'Space Mono',monospace", fontSize: "0.5rem", color: "#3d444d", letterSpacing: "0.12em", textTransform: "uppercase" }}>
+                Displaying {summary.highRiskDistricts.length} high-risk sectors · Sri Lanka Crime Intelligence System
+              </div>
+            </div>
+          </div>
         )}
+
       </div>
     </div>
   );

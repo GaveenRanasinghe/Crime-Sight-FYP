@@ -284,13 +284,13 @@ export default function LoginPage() {
       <div className="login-bg-glow" />
       <div className="login-side-text">Secure Command Control</div>
       <div className="login-node-text">
-        0734
-        <div className="login-node-sub">Forensic Node</div>
+        
+        <div className="login-node-sub"></div>
       </div>
 
       {/* Back */}
       <Link href="/" className="login-back">
-        ← Back to Home
+        
       </Link>
 
       {/* Header */}

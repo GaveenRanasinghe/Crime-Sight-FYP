@@ -37,12 +37,14 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
-const trpcClient = trpc.createClient({
+const trpcAny = trpc as any;
+
+const trpcClient = trpcAny.createClient({
   links: [
     httpBatchLink({
       url: "/api/trpc",
       transformer: superjson,
-      fetch(input, init) {
+      fetch(input: RequestInfo | URL, init?: RequestInit) {
         return globalThis.fetch(input, {
           ...(init ?? {}),
           credentials: "include",
@@ -53,9 +55,9 @@ const trpcClient = trpc.createClient({
 });
 
 createRoot(document.getElementById("root")!).render(
-  <trpc.Provider client={trpcClient} queryClient={queryClient}>
+  <trpcAny.Provider client={trpcClient} queryClient={queryClient}>
     <QueryClientProvider client={queryClient}>
       <App />
     </QueryClientProvider>
-  </trpc.Provider>
+  </trpcAny.Provider>
 );
