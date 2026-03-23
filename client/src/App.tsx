@@ -31,13 +31,13 @@ function Navigation({ onSidebarStateChange }: { onSidebarStateChange: (open: boo
 
   return (
     <>
-      <div className={`fixed left-0 top-0 h-screen bg-gradient-to-b from-blue-900 to-blue-800 text-white shadow-xl transition-all duration-300 z-50 ${
+      <div className={`fixed left-0 top-0 h-screen bg-gradient-to-b from-zinc-950 to-zinc-900 text-white shadow-xl transition-all duration-300 z-50 ${
         sidebarOpen ? "w-64" : "w-20"
       }`}>
         <div className="flex flex-col h-full">
 
           {/* Logo */}
-          <div className="p-6 border-b border-blue-700">
+          <div className="p-6 border-b border-zinc-800">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center flex-shrink-0">
         <img
@@ -55,22 +55,22 @@ function Navigation({ onSidebarStateChange }: { onSidebarStateChange: (open: boo
           {/* Navigation */}
           <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto">
 
-            <Link href="/" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-700 transition">
+            <Link href="/" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-zinc-800 transition">
               <span className="text-lg">🏠</span>
               {sidebarOpen && <span>Home</span>}
             </Link>
 
-            <Link href="/dashboard" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-700 transition">
+            <Link href="/dashboard" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-zinc-800 transition">
               <span className="text-lg">📊</span>
               {sidebarOpen && <span>Dashboard</span>}
             </Link>
 
-            <Link href="/map" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-700 transition">
+            <Link href="/map" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-zinc-800 transition">
               <span className="text-lg">🗺️</span>
               {sidebarOpen && <span>Crime Map</span>}
             </Link>
 
-            <Link href="/predictions" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-700 transition">
+            <Link href="/predictions" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-zinc-800 transition">
               <span className="text-lg">🔮</span>
               {sidebarOpen && <span>Predictions</span>}
             </Link>
@@ -78,13 +78,13 @@ function Navigation({ onSidebarStateChange }: { onSidebarStateChange: (open: boo
           </nav>
 
           {/* User section */}
-          <div className="border-t border-blue-700 p-3 space-y-3">
+          <div className="border-t border-zinc-800 p-3 space-y-3">
             {isAuthenticated ? (
               <>
                 {sidebarOpen && (
                   <div className="px-4 py-2 text-sm truncate">
-                    <p className="text-blue-200 text-xs">Logged in as</p>
-                    <p className="font-semibold truncate">{user?.email}</p>
+                    <p className="text-gray-400 text-xs">Logged in as</p>
+                    <p className="font-semibold truncate text-white">{user?.email}</p>
                   </div>
                 )}
 
@@ -92,7 +92,7 @@ function Navigation({ onSidebarStateChange }: { onSidebarStateChange: (open: boo
                   onClick={handleLogout}
                   variant="outline"
                   size="sm"
-                  className="bg-white text-blue-900 hover:bg-blue-50 w-full"
+                  className="bg-orange-600 text-white hover:bg-orange-700 w-full border-orange-600"
                 >
                   {sidebarOpen ? "Logout" : "🚪"}
                 </Button>
@@ -100,7 +100,7 @@ function Navigation({ onSidebarStateChange }: { onSidebarStateChange: (open: boo
             ) : (
               <Link
                 href="/auth/login"
-                className="block bg-white text-blue-900 px-4 py-2 rounded font-semibold hover:bg-blue-50 text-center"
+                className="block bg-orange-600 text-white px-4 py-2 rounded font-semibold hover:bg-orange-700 text-center"
               >
                 {sidebarOpen ? "Login" : "🔐"}
               </Link>
@@ -110,7 +110,7 @@ function Navigation({ onSidebarStateChange }: { onSidebarStateChange: (open: boo
           {/* Sidebar Toggle */}
           <button
             onClick={() => handleToggleSidebar(!sidebarOpen)}
-            className="w-full p-4 border-t border-blue-700 hover:bg-blue-700 transition flex items-center justify-center"
+            className="w-full p-4 border-t border-zinc-800 hover:bg-zinc-800 transition flex items-center justify-center"
           >
             {sidebarOpen ? <span>‹</span> : <span>›</span>}
           </button>

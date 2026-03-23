@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect, useRef } from "react";
 import L from "leaflet";
 import { MapView } from "@/components/Map";
@@ -247,9 +249,9 @@ export default function CrimeMap() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-gray-600">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-gray-400">
+          <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
           <p className="text-lg font-medium">Loading map data...</p>
         </div>
       </div>
@@ -258,18 +260,18 @@ export default function CrimeMap() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-6">
-        <Card className="max-w-lg w-full border-red-200">
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+        <Card className="max-w-lg w-full border-orange-500/50 bg-zinc-900">
           <CardHeader>
-            <div className="flex items-center gap-2 text-red-600">
+            <div className="flex items-center gap-2 text-orange-500">
               <AlertCircle className="w-5 h-5" />
-              <CardTitle className="text-red-600">Failed to Load Map Data</CardTitle>
+              <CardTitle className="text-orange-500">Failed to Load Map Data</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-gray-700 text-sm">{error}</p>
+            <p className="text-gray-300 text-sm">{error}</p>
             <button onClick={() => window.location.reload()}
-              className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium">
+              className="w-full py-2 px-4 bg-orange-600 text-white rounded hover:bg-orange-700 text-sm font-medium">
               Retry
             </button>
           </CardContent>
@@ -282,27 +284,27 @@ export default function CrimeMap() {
   const crimeDef          = getCrimeDef();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+    <div className="min-h-screen bg-zinc-950 p-6">
       <div className="max-w-7xl mx-auto">
 
         {/* ── Page header ── */}
         <div className="mb-6">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Crime Hotspot Map</h1>
-          <p className="text-gray-600">Interactive GIS visualization of crime intensity by district</p>
+          <h1 className="text-4xl font-bold text-white mb-2">CRIME HOTSPOT MAP</h1>
+          <p className="text-gray-400">Interactive GIS visualization of crime intensity by district</p>
         </div>
 
         {/* ── Filter bar — ABOVE the map so dropdowns never go behind it ── */}
-        <div className="bg-white rounded-xl border shadow-sm px-5 py-4 mb-4 flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2 text-gray-600">
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 shadow-sm px-5 py-4 mb-4 flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2 text-gray-400">
             <Filter className="w-4 h-4" />
             <span className="text-sm font-medium">Filters:</span>
           </div>
 
           {/* Crime type dropdown */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500 font-medium uppercase tracking-wide">Crime Type</label>
+            <label className="text-xs text-gray-400 font-medium uppercase tracking-wide">Crime Type</label>
             <Select value={selectedCrime} onValueChange={setSelectedCrime}>
-              <SelectTrigger className="w-56 bg-white">
+              <SelectTrigger className="w-56 bg-zinc-800 border-zinc-700 text-white">
                 <SelectValue placeholder="Select crime type" />
               </SelectTrigger>
               <SelectContent className="z-[9999]">
@@ -317,9 +319,9 @@ export default function CrimeMap() {
 
           {/* Year dropdown */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500 font-medium uppercase tracking-wide">Year</label>
+            <label className="text-xs text-gray-400 font-medium uppercase tracking-wide">Year</label>
             <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-28 bg-white">
+              <SelectTrigger className="w-28 bg-zinc-800 border-zinc-700 text-white">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="z-[9999]">
@@ -331,20 +333,20 @@ export default function CrimeMap() {
           {/* Active filter badge */}
           <div className="ml-auto flex items-center gap-2">
             <span className="text-xs text-gray-500">Showing:</span>
-            <span className="bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-3 py-1 text-sm font-medium">
+            <span className="bg-orange-950/50 text-orange-400 border border-orange-500/50 rounded-full px-3 py-1 text-sm font-medium">
               {crimeDef.emoji} {crimeDef.label}
             </span>
-            <span className="bg-gray-100 text-gray-700 border border-gray-200 rounded-full px-3 py-1 text-sm font-medium">
+            <span className="bg-zinc-800 text-gray-300 border border-zinc-700 rounded-full px-3 py-1 text-sm font-medium">
               {selectedYear}
             </span>
           </div>
         </div>
 
         {/* ── Map card ── */}
-        <Card className="mb-4">
+        <Card className="mb-4 bg-zinc-900 border-zinc-800">
           <CardHeader className="pb-3">
-            <CardTitle>Crime Distribution Map</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-white">Crime Distribution Map</CardTitle>
+            <CardDescription className="text-gray-400">
               District boundaries colored by risk level. Click or hover for details.
             </CardDescription>
           </CardHeader>
@@ -357,53 +359,53 @@ export default function CrimeMap() {
 
         {/* ── Legend ── */}
         <div className="flex gap-6 mb-6 flex-wrap items-center">
-          <span className="text-sm text-gray-500 font-medium">Risk Level:</span>
+          <span className="text-sm text-gray-400 font-medium">Risk Level:</span>
           {(Object.entries(RISK_COLORS) as [RiskLevel, string][]).map(([level, color]) => (
             <div key={level} className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded border-2 border-white shadow" style={{ backgroundColor: color }} />
-              <span className="text-sm text-gray-600 capitalize font-medium">{level}</span>
+              <div className="w-4 h-4 rounded border-2 border-zinc-800 shadow" style={{ backgroundColor: color }} />
+              <span className="text-sm text-gray-400 capitalize font-medium">{level}</span>
             </div>
           ))}
         </div>
 
         {/* ── Stats table ── */}
-        <Card>
+        <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader>
-            <CardTitle>District Statistics</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-white">District Statistics</CardTitle>
+            <CardDescription className="text-gray-400">
               {crimeDef.emoji} {crimeDef.label} · {selectedYear} — sorted by count
             </CardDescription>
           </CardHeader>
           <CardContent>
             <table className="w-full text-sm">
-              <thead className="border-b bg-gray-50">
+              <thead className="border-b border-zinc-800 bg-zinc-800/50">
                 <tr>
-                  <th className="text-left py-3 px-4">#</th>
-                  <th className="text-left py-3 px-4">District</th>
-                  <th className="text-left py-3 px-4">Province</th>
-                  <th className="text-left py-3 px-4">{crimeDef.label}</th>
-                  <th className="text-left py-3 px-4">Intensity</th>
-                  <th className="text-left py-3 px-4">Risk Level</th>
+                  <th className="text-left py-3 px-4 text-gray-400">#</th>
+                  <th className="text-left py-3 px-4 text-gray-400">District</th>
+                  <th className="text-left py-3 px-4 text-gray-400">Province</th>
+                  <th className="text-left py-3 px-4 text-gray-400">{crimeDef.label}</th>
+                  <th className="text-left py-3 px-4 text-gray-400">Intensity</th>
+                  <th className="text-left py-3 px-4 text-gray-400">Risk Level</th>
                 </tr>
               </thead>
               <tbody>
                 {districtCrimeData
                   .sort((a, b) => b.value - a.value)
                   .map(({ district, value, intensity, riskLevel }, index) => (
-                    <tr key={district.id} className="border-b hover:bg-gray-50 transition-colors">
-                      <td className="py-3 px-4 text-gray-400">{index + 1}</td>
-                      <td className="py-3 px-4 font-medium">{district.name}</td>
+                    <tr key={district.id} className="border-b border-zinc-800 hover:bg-zinc-800/30 transition-colors">
+                      <td className="py-3 px-4 text-gray-500">{index + 1}</td>
+                      <td className="py-3 px-4 font-medium text-white">{district.name}</td>
                       <td className="py-3 px-4 text-gray-500">{district.province ?? "—"}</td>
-                      <td className="py-3 px-4 font-semibold">{value.toLocaleString()}</td>
+                      <td className="py-3 px-4 font-semibold text-white">{value.toLocaleString()}</td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
-                          <div className="w-24 bg-gray-200 rounded-full h-2">
+                          <div className="w-24 bg-zinc-800 rounded-full h-2">
                             <div className="h-2 rounded-full" style={{
                               width: `${(intensity * 100).toFixed(0)}%`,
                               backgroundColor: RISK_COLORS[riskLevel],
                             }} />
                           </div>
-                          <span className="text-xs">{(intensity * 100).toFixed(0)}%</span>
+                          <span className="text-xs text-gray-400">{(intensity * 100).toFixed(0)}%</span>
                         </div>
                       </td>
                       <td className="py-3 px-4">
