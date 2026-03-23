@@ -94,6 +94,300 @@ const RISK_COLORS: Record<RiskLevel, string> = {
 
 const GEOJSON_URL = "/sri-lanka-districts.json";
 
+const mapStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&family=Inter:wght@300;400;500;600&display=swap');
+
+  .map-page {
+    min-height: 100vh;
+    background: #0a0c0f;
+    padding: 2rem;
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* Page header */
+  .map-page-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 1.75rem; flex-wrap: wrap; gap: 1.5rem;
+  }
+  .map-page-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.8rem; line-height: 0.95; letter-spacing: 0.04em;
+    color: #fff; margin-bottom: 0.4rem;
+  }
+  .map-page-title span { color: #ff6b4a; }
+  .map-page-sub {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.62rem; letter-spacing: 0.1em;
+    color: #555e6a; text-transform: uppercase; max-width: 460px; line-height: 1.6;
+  }
+  .map-header-stats { display: flex; gap: 1.5rem; }
+  .map-header-stat {
+    background: #0d1117;
+    border: 1px solid rgba(255,107,74,0.15);
+    padding: 0.75rem 1.25rem; min-width: 120px;
+    position: relative;
+  }
+  .map-header-stat::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 2px; background: linear-gradient(90deg, #ff6b4a, transparent);
+  }
+  .map-header-stat-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.5rem; letter-spacing: 0.16em;
+    color: #555e6a; text-transform: uppercase; margin-bottom: 0.25rem;
+  }
+  .map-header-stat-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem; line-height: 1; color: #ff6b4a;
+  }
+  .map-header-stat-val.elevated { color: #facc15; font-size: 1.3rem; letter-spacing: 0.04em; }
+
+  /* Main grid */
+  .map-grid {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  /* Left panel */
+  .map-panel {
+    background: #0d1117;
+    border: 1px solid rgba(255,107,74,0.15);
+    display: flex; flex-direction: column; gap: 0;
+    position: relative; overflow: hidden;
+  }
+  .map-panel::before {
+    content: ''; position: absolute; top: 0; left: 0; bottom: 0;
+    width: 2px; background: linear-gradient(180deg, #ff6b4a, rgba(255,107,74,0.1));
+  }
+  .map-panel-section {
+    padding: 1.25rem 1.25rem 1rem;
+    border-bottom: 1px solid rgba(255,107,74,0.08);
+  }
+  .map-panel-section:last-child { border-bottom: none; flex: 1; }
+  .map-panel-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.55rem; letter-spacing: 0.18em;
+    color: #ff6b4a; text-transform: uppercase;
+    margin-bottom: 0.875rem;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .map-panel-label svg { flex-shrink: 0; }
+
+  /* Crime type select */
+  .map-select-wrap { margin-bottom: 1rem; }
+  .map-field-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.52rem; letter-spacing: 0.14em;
+    color: #555e6a; text-transform: uppercase; margin-bottom: 0.4rem; display: block;
+  }
+
+  /* Year pills */
+  .map-year-pills { display: flex; gap: 0.4rem; }
+  .map-year-pill {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.62rem; letter-spacing: 0.08em;
+    padding: 0.45rem 0.875rem;
+    border: 1px solid rgba(255,107,74,0.2);
+    background: transparent; color: #8b949e;
+    cursor: pointer; transition: all 0.15s; text-transform: uppercase;
+  }
+  .map-year-pill:hover { border-color: rgba(255,107,74,0.4); color: #e2e8f0; }
+  .map-year-pill.active {
+    background: #ff6b4a; border-color: #ff6b4a;
+    color: #0a0c0f; font-weight: 700;
+  }
+
+  /* Legend */
+  .map-legend { display: flex; flex-direction: column; gap: 0.5rem; }
+  .map-legend-item { display: flex; align-items: center; gap: 0.6rem; }
+  .map-legend-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .map-legend-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem; color: #8b949e; letter-spacing: 0.06em;
+  }
+
+  /* Operational insight */
+  .map-insight {
+    background: rgba(255,107,74,0.05);
+    border: 1px solid rgba(255,107,74,0.15);
+    padding: 1rem;
+    margin: 1.25rem;
+    position: relative;
+  }
+  .map-insight-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.52rem; letter-spacing: 0.16em;
+    color: #ff6b4a; text-transform: uppercase; margin-bottom: 0.5rem;
+  }
+  .map-insight-text {
+    font-size: 0.78rem; color: #8b949e; line-height: 1.65;
+  }
+
+  /* Map container */
+  .map-container {
+    background: #0d1117;
+    border: 1px solid rgba(255,107,74,0.15);
+    overflow: hidden; position: relative;
+  }
+  .map-container-header {
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid rgba(255,107,74,0.1);
+    display: flex; align-items: center; justify-content: space-between;
+    background: #0d1117;
+  }
+  .map-container-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem; letter-spacing: 0.14em;
+    color: #e2e8f0; text-transform: uppercase;
+  }
+  .map-container-sub {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.52rem; letter-spacing: 0.08em;
+    color: #555e6a; text-transform: uppercase;
+  }
+  .map-active-badge {
+    background: rgba(255,107,74,0.1);
+    border: 1px solid rgba(255,107,74,0.25);
+    padding: 0.2rem 0.6rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.52rem; color: #ff6b4a; letter-spacing: 0.1em; text-transform: uppercase;
+  }
+
+  /* District analytics table */
+  .analytics-section { margin-top: 1.5rem; }
+  .analytics-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  .analytics-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.6rem; letter-spacing: 0.04em; color: #fff;
+    display: flex; align-items: center; gap: 0.75rem;
+  }
+  .analytics-title-icon { color: #ff6b4a; }
+  .analytics-export {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
+    background: transparent;
+    border: 1px solid rgba(255,107,74,0.25);
+    color: #ff6b4a; padding: 0.45rem 0.875rem; cursor: pointer;
+    transition: all 0.15s; display: flex; align-items: center; gap: 0.4rem;
+  }
+  .analytics-export:hover { background: rgba(255,107,74,0.08); border-color: rgba(255,107,74,0.5); }
+
+  .analytics-table-wrap {
+    background: #0d1117;
+    border: 1px solid rgba(255,107,74,0.12);
+    overflow: hidden;
+  }
+  .analytics-table { width: 100%; border-collapse: collapse; }
+  .analytics-thead { background: #111418; }
+  .analytics-th {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.52rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #555e6a; padding: 0.875rem 1rem; text-align: left;
+    border-bottom: 1px solid rgba(255,107,74,0.1);
+  }
+  .analytics-tr {
+    border-bottom: 1px solid rgba(255,107,74,0.06);
+    transition: background 0.15s;
+  }
+  .analytics-tr:hover { background: rgba(255,107,74,0.04); }
+  .analytics-tr:last-child { border-bottom: none; }
+  .analytics-td {
+    padding: 0.875rem 1rem; font-size: 0.85rem; color: #8b949e;
+    font-family: 'Inter', sans-serif;
+  }
+  .analytics-td.rank { color: #3d444d; font-family: 'Space Mono', monospace; font-size: 0.65rem; }
+  .analytics-td.district-name {
+    color: #e2e8f0; font-weight: 600;
+    display: flex; align-items: center; gap: 0.6rem;
+  }
+  .district-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .analytics-td.crime-index {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.15rem; color: #e2e8f0; letter-spacing: 0.04em;
+  }
+
+  /* Risk badge */
+  .risk-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.52rem; letter-spacing: 0.1em; font-weight: 700;
+    padding: 0.2rem 0.5rem; text-transform: uppercase; color: #0a0c0f;
+  }
+
+  /* Intensity bar */
+  .intensity-wrap { display: flex; align-items: center; gap: 0.6rem; }
+  .intensity-track {
+    flex: 1; height: 3px; background: #1e2530; max-width: 120px;
+  }
+  .intensity-fill { height: 100%; transition: width 0.3s; }
+  .intensity-pct {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.52rem; color: #555e6a; width: 28px; text-align: right;
+  }
+
+  /* Table footer */
+  .analytics-footer {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid rgba(255,107,74,0.08);
+    background: #111418;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .analytics-footer-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.52rem; letter-spacing: 0.12em;
+    color: #3d444d; text-transform: uppercase;
+  }
+
+  /* Loading / Error states */
+  .map-loading {
+    min-height: 100vh; background: #0a0c0f;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 1rem;
+  }
+  .map-loading-text {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem; letter-spacing: 0.14em;
+    color: #555e6a; text-transform: uppercase;
+  }
+  .map-error-card {
+    background: #0d1117;
+    border: 1px solid rgba(255,107,74,0.25);
+    max-width: 480px; width: 100%; padding: 2rem;
+    position: relative;
+  }
+  .map-error-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 2px; background: #ff6b4a;
+  }
+  .map-error-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: #ff6b4a; margin-bottom: 0.75rem;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .map-error-msg { font-size: 0.85rem; color: #8b949e; margin-bottom: 1.25rem; line-height: 1.6; }
+  .map-retry-btn {
+    width: 100%; background: #ff6b4a; color: #0a0c0f;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 0.75rem; border: none; cursor: pointer; transition: background 0.15s;
+  }
+  .map-retry-btn:hover { background: #ff8c74; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .map-grid { grid-template-columns: 1fr; }
+    .map-page-header { flex-direction: column; }
+    .map-header-stats { flex-wrap: wrap; }
+  }
+`;
+
 export default function CrimeMap() {
   const [districts, setDistricts]         = useState<District[]>([]);
   const [allStats, setAllStats]           = useState<CrimeStat[]>([]);
@@ -247,180 +541,232 @@ export default function CrimeMap() {
     if (districts.length && allStats.length) drawLayers(map);
   };
 
+  // ── Loading state ──
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-gray-400">
-          <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
-          <p className="text-lg font-medium">Loading map data...</p>
-        </div>
+      <div className="map-loading">
+        <style>{mapStyles}</style>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ff6b4a" strokeWidth="1.5"
+          style={{ animation: "spin 1s linear infinite" }}>
+          <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+        </svg>
+        <p className="map-loading-text">Loading Crime Map...</p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
+  // ── Error state ──
   if (error) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
-        <Card className="max-w-lg w-full border-orange-500/50 bg-zinc-900">
-          <CardHeader>
-            <div className="flex items-center gap-2 text-orange-500">
-              <AlertCircle className="w-5 h-5" />
-              <CardTitle className="text-orange-500">Failed to Load Map Data</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-gray-300 text-sm">{error}</p>
-            <button onClick={() => window.location.reload()}
-              className="w-full py-2 px-4 bg-orange-600 text-white rounded hover:bg-orange-700 text-sm font-medium">
-              Retry
-            </button>
-          </CardContent>
-        </Card>
+      <div style={{ minHeight: "100vh", background: "#0a0c0f", display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
+        <style>{mapStyles}</style>
+        <div className="map-error-card">
+          <div className="map-error-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            Map Data Load Failure
+          </div>
+          <p className="map-error-msg">{error}</p>
+          <button className="map-retry-btn" onClick={() => window.location.reload()}>
+            Retry Connection
+          </button>
+        </div>
       </div>
     );
   }
 
   const districtCrimeData = getDistrictCrimeData();
   const crimeDef          = getCrimeDef();
+  const totalCrimes       = districtCrimeData.reduce((s, d) => s + d.value, 0);
+  const criticalCount     = districtCrimeData.filter(d => d.riskLevel === "critical").length;
+  const overallRisk       = criticalCount > 3 ? "CRITICAL" : criticalCount > 1 ? "ELEVATED" : "NOMINAL";
 
   return (
-    <div className="min-h-screen bg-zinc-950 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="map-page">
+      <style>{mapStyles}</style>
 
-        {/* ── Page header ── */}
-        <div className="mb-6">
-          <h1 className="text-4xl font-bold text-white mb-2">CRIME HOTSPOT MAP</h1>
-          <p className="text-gray-400">Interactive GIS visualization of crime intensity by district</p>
+      {/* ── Page header ── */}
+      <div className="map-page-header">
+        <div>
+          <h1 className="map-page-title">Crime Hotspot Map<span></span></h1>
+          <p className="map-page-sub">
+            GIS Map visualization of regional risk areas across Sri Lanka.
+            Real-time incident data aggregated by district sectors.
+          </p>
         </div>
-
-        {/* ── Filter bar — ABOVE the map so dropdowns never go behind it ── */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 shadow-sm px-5 py-4 mb-4 flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2 text-gray-400">
-            <Filter className="w-4 h-4" />
-            <span className="text-sm font-medium">Filters:</span>
+        <div className="map-header-stats">
+          <div className="map-header-stat">
+            <div className="map-header-stat-label">Active Alerts</div>
+            <div className="map-header-stat-val">{totalCrimes.toLocaleString()}</div>
           </div>
-
-          {/* Crime type dropdown */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-400 font-medium uppercase tracking-wide">Crime Type</label>
-            <Select value={selectedCrime} onValueChange={setSelectedCrime}>
-              <SelectTrigger className="w-56 bg-zinc-800 border-zinc-700 text-white">
-                <SelectValue placeholder="Select crime type" />
-              </SelectTrigger>
-              <SelectContent className="z-[9999]">
-                {CRIME_TYPES.map((c) => (
-                  <SelectItem key={c.key} value={c.key}>
-                    {c.emoji} {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Year dropdown */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-400 font-medium uppercase tracking-wide">Year</label>
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-28 bg-zinc-800 border-zinc-700 text-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="z-[9999]">
-                {years.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Active filter badge */}
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-xs text-gray-500">Showing:</span>
-            <span className="bg-orange-950/50 text-orange-400 border border-orange-500/50 rounded-full px-3 py-1 text-sm font-medium">
-              {crimeDef.emoji} {crimeDef.label}
-            </span>
-            <span className="bg-zinc-800 text-gray-300 border border-zinc-700 rounded-full px-3 py-1 text-sm font-medium">
-              {selectedYear}
-            </span>
+          <div className="map-header-stat">
+            <div className="map-header-stat-label">Risk Level</div>
+            <div className={`map-header-stat-val elevated`}>{overallRisk}</div>
           </div>
         </div>
+      </div>
 
-        {/* ── Map card ── */}
-        <Card className="mb-4 bg-zinc-900 border-zinc-800">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-white">Crime Distribution Map</CardTitle>
-            <CardDescription className="text-gray-400">
-              District boundaries colored by risk level. Click or hover for details.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="rounded-b-xl overflow-hidden">
-              <MapView onMapReady={handleMapReady} />
+      {/* ── Main grid: left panel + map ── */}
+      <div className="map-grid">
+
+        {/* Left panel */}
+        <div className="map-panel">
+          <div className="map-panel-section">
+            <div className="map-panel-label">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46"/></svg>
+              Data Filters
             </div>
-          </CardContent>
-        </Card>
 
-        {/* ── Legend ── */}
-        <div className="flex gap-6 mb-6 flex-wrap items-center">
-          <span className="text-sm text-gray-400 font-medium">Risk Level:</span>
-          {(Object.entries(RISK_COLORS) as [RiskLevel, string][]).map(([level, color]) => (
-            <div key={level} className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded border-2 border-zinc-800 shadow" style={{ backgroundColor: color }} />
-              <span className="text-sm text-gray-400 capitalize font-medium">{level}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* ── Stats table ── */}
-        <Card className="bg-zinc-900 border-zinc-800">
-          <CardHeader>
-            <CardTitle className="text-white">District Statistics</CardTitle>
-            <CardDescription className="text-gray-400">
-              {crimeDef.emoji} {crimeDef.label} · {selectedYear} — sorted by count
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <table className="w-full text-sm">
-              <thead className="border-b border-zinc-800 bg-zinc-800/50">
-                <tr>
-                  <th className="text-left py-3 px-4 text-gray-400">#</th>
-                  <th className="text-left py-3 px-4 text-gray-400">District</th>
-                  <th className="text-left py-3 px-4 text-gray-400">Province</th>
-                  <th className="text-left py-3 px-4 text-gray-400">{crimeDef.label}</th>
-                  <th className="text-left py-3 px-4 text-gray-400">Intensity</th>
-                  <th className="text-left py-3 px-4 text-gray-400">Risk Level</th>
-                </tr>
-              </thead>
-              <tbody>
-                {districtCrimeData
-                  .sort((a, b) => b.value - a.value)
-                  .map(({ district, value, intensity, riskLevel }, index) => (
-                    <tr key={district.id} className="border-b border-zinc-800 hover:bg-zinc-800/30 transition-colors">
-                      <td className="py-3 px-4 text-gray-500">{index + 1}</td>
-                      <td className="py-3 px-4 font-medium text-white">{district.name}</td>
-                      <td className="py-3 px-4 text-gray-500">{district.province ?? "—"}</td>
-                      <td className="py-3 px-4 font-semibold text-white">{value.toLocaleString()}</td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-24 bg-zinc-800 rounded-full h-2">
-                            <div className="h-2 rounded-full" style={{
-                              width: `${(intensity * 100).toFixed(0)}%`,
-                              backgroundColor: RISK_COLORS[riskLevel],
-                            }} />
-                          </div>
-                          <span className="text-xs text-gray-400">{(intensity * 100).toFixed(0)}%</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="px-2 py-1 rounded text-white text-xs font-semibold"
-                          style={{ backgroundColor: RISK_COLORS[riskLevel] }}>
-                          {riskLevel.toUpperCase()}
-                        </span>
-                      </td>
-                    </tr>
+            <div className="map-select-wrap">
+              <span className="map-field-label">Crime Type</span>
+              <Select value={selectedCrime} onValueChange={setSelectedCrime}>
+                <SelectTrigger style={{
+                  background: "#0a0c0f", border: "1px solid rgba(255,107,74,0.2)",
+                  borderRadius: 0, color: "#e2e8f0",
+                  fontFamily: "'Space Mono',monospace", fontSize: "0.7rem",
+                }}>
+                  <SelectValue placeholder="Select crime type" />
+                </SelectTrigger>
+                <SelectContent className="z-[9999]">
+                  {CRIME_TYPES.map((c) => (
+                    <SelectItem key={c.key} value={c.key}>{c.emoji} {c.label}</SelectItem>
                   ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+                </SelectContent>
+              </Select>
+            </div>
 
+            <div>
+              <span className="map-field-label">Intelligence Year</span>
+              <div className="map-year-pills">
+                {years.map((y) => (
+                  <button
+                    key={y}
+                    className={`map-year-pill ${selectedYear === y ? "active" : ""}`}
+                    onClick={() => setSelectedYear(y)}
+                  >{y}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="map-panel-section">
+            <div className="map-panel-label">Legend</div>
+            <div className="map-legend">
+              {([
+                ["critical", "#dc2626", "Critical Risk"],
+                ["high",     "#ea580c", "High Alert"],
+                ["medium",   "#f59e0b", "Medium Risk"],
+                ["low",      "#10b981", "Low & Stable"],
+              ] as const).map(([, color, label]) => (
+                <div className="map-legend-item" key={label}>
+                  <div className="map-legend-dot" style={{ background: color }} />
+                  <span className="map-legend-label">{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Operational insight */}
+          <div className="map-insight">
+            <div className="map-insight-title">Operational Insight</div>
+            <p className="map-insight-text">
+              Showing <strong style={{color:"#ff6b4a"}}>{crimeDef.label}</strong> data
+              for <strong style={{color:"#ff6b4a"}}>{selectedYear}</strong>.
+              {criticalCount > 0 && ` ${criticalCount} district${criticalCount > 1 ? "s" : ""} at critical risk level.`}
+            </p>
+          </div>
+        </div>
+
+        {/* Map */}
+        <div className="map-container">
+          <div className="map-container-header">
+            <div>
+              <div className="map-container-title">Crime Distribution Map</div>
+              <div className="map-container-sub">District boundaries colored by risk level · Click or hover for details</div>
+            </div>
+            <div className="map-active-badge">{crimeDef.emoji} {crimeDef.label} · {selectedYear}</div>
+          </div>
+          <MapView onMapReady={handleMapReady} />
+        </div>
+      </div>
+
+      {/* ── District analytics table ── */}
+      <div className="analytics-section">
+        <div className="analytics-header">
+          <div className="analytics-title">
+            <svg className="analytics-title-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+            </svg>
+            District Analytics
+          </div>
+          <button className="analytics-export">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Export Forensic Report
+          </button>
+        </div>
+
+        <div className="analytics-table-wrap">
+          <table className="analytics-table">
+            <thead className="analytics-thead">
+              <tr>
+                <th className="analytics-th">#</th>
+                <th className="analytics-th">District</th>
+                <th className="analytics-th">Province</th>
+                <th className="analytics-th">Crime Index</th>
+                <th className="analytics-th">Risk Level</th>
+                <th className="analytics-th">Intensity Profile</th>
+              </tr>
+            </thead>
+            <tbody>
+              {districtCrimeData
+                .sort((a, b) => b.value - a.value)
+                .map(({ district, value, intensity, riskLevel }, index) => (
+                  <tr key={district.id} className="analytics-tr">
+                    <td className="analytics-td rank">{String(index + 1).padStart(2, "0")}</td>
+                    <td className="analytics-td">
+                      <div className="district-name" style={{display:"flex",alignItems:"center",gap:"0.6rem",color:"#e2e8f0",fontWeight:600}}>
+                        <div className="district-dot" style={{ background: RISK_COLORS[riskLevel] }} />
+                        {district.name}
+                      </div>
+                    </td>
+                    <td className="analytics-td">{district.province ?? "—"}</td>
+                    <td className="analytics-td crime-index" style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.15rem",color:"#e2e8f0",letterSpacing:"0.04em"}}>
+                      {value.toLocaleString()}
+                    </td>
+                    <td className="analytics-td">
+                      <span className="risk-badge" style={{ background: RISK_COLORS[riskLevel] }}>
+                        {riskLevel.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="analytics-td">
+                      <div className="intensity-wrap">
+                        <div className="intensity-track">
+                          <div className="intensity-fill" style={{
+                            width: `${(intensity * 100).toFixed(0)}%`,
+                            background: RISK_COLORS[riskLevel],
+                          }} />
+                        </div>
+                        <span className="intensity-pct">{(intensity * 100).toFixed(0)}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+          <div className="analytics-footer">
+            <span className="analytics-footer-label">
+              Displaying {districtCrimeData.length} of {districtCrimeData.length} sectors
+            </span>
+            <span className="analytics-footer-label">{crimeDef.label} · {selectedYear}</span>
+          </div>
+        </div>
       </div>
     </div>
   );

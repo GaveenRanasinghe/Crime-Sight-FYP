@@ -480,7 +480,7 @@ export default function Home() {
           <div className="hero-glow"></div>
           <div className="hero-inner">
             <div>
-              <div className="hero-eyebrow">Crime Intelligence Platform</div>
+              
               <h1 className="hero-title">
                 Sri Lanka<br />
                 <span>Crime Prediction</span><br />
