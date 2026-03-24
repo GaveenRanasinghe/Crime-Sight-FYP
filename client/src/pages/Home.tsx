@@ -167,7 +167,7 @@ export default function Home() {
         {/* STATUS BAR */}
         <div className="status-bar">
           <div className="status-dot"></div>
-          <span className="status-text">SYSTEM ONLINE // FORENSIC ACCESS GRANTED</span>
+          <span className="status-text">SYSTEM ONLINE // Admin ACCESS GRANTED</span>
         </div>
 
         {/* HERO */}
@@ -308,52 +308,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* INTELLIGENCE ENGINE */}
-        <section className="section" style={{background:"#0d1117",paddingTop:"4rem",paddingBottom:"4rem"}}>
-          <div className="section-inner">
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"3rem",alignItems:"center"}}>
-              <div>
-                <div className="section-eyebrow">Intelligence Engine</div>
-                <h2 className="section-title" style={{fontSize:"2.2rem"}}>Proprietary Forensic<br/>Architecture</h2>
-                <p style={{fontSize:"0.88rem",color:"#8b949e",lineHeight:"1.7",marginBottom:"1.5rem"}}>
-                  Our neural network processes over 50,000 historical case files to predict future trends with surgical precision.
-                </p>
-                <div style={{display:"flex",gap:"1.5rem"}}>
-                  <div style={{background:"#0a0c0f",border:"1px solid rgba(255,107,74,0.15)",padding:"1rem 1.5rem"}}>
-                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2rem",color:"#ff6b4a",lineHeight:1}}>25</div>
-                    <div style={{fontFamily:"'Space Mono',monospace",fontSize:"0.55rem",color:"#555e6a",letterSpacing:"0.1em",textTransform:"uppercase"}}>Districts Covered</div>
-                  </div>
-                  <div style={{background:"#0a0c0f",border:"1px solid rgba(255,107,74,0.15)",padding:"1rem 1.5rem"}}>
-                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2rem",color:"#ff6b4a",lineHeight:1}}>13</div>
-                    <div style={{fontFamily:"'Space Mono',monospace",fontSize:"0.55rem",color:"#555e6a",letterSpacing:"0.1em",textTransform:"uppercase"}}>Crime Types</div>
-                  </div>
-                </div>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
-                <div style={{background:"#0a0c0f",border:"1px solid rgba(74,222,128,0.2)",padding:"1rem 1.5rem",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                  <div>
-                    <div style={{fontFamily:"'Space Mono',monospace",fontSize:"0.55rem",color:"#555e6a",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"0.25rem"}}>Current Status</div>
-                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.4rem",color:"#fff",letterSpacing:"0.05em"}}>SYSTEM OPERATIONAL</div>
-                  </div>
-                  <div style={{background:"rgba(74,222,128,0.1)",border:"1px solid rgba(74,222,128,0.3)",padding:"0.2rem 0.6rem",fontFamily:"'Space Mono',monospace",fontSize:"0.55rem",color:"#4ade80",letterSpacing:"0.1em"}}>
-                    ● LATENCY: 14MS
-                  </div>
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem"}}>
-                  <div style={{background:"#0a0c0f",border:"1px solid rgba(255,107,74,0.15)",padding:"1rem",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:"0.5rem"}}>
-                    <div style={{color:"#ff6b4a",fontSize:"1.4rem"}}>🛡</div>
-                    <div style={{fontFamily:"'Space Mono',monospace",fontSize:"0.55rem",color:"#555e6a",letterSpacing:"0.1em",textTransform:"uppercase",textAlign:"center"}}>Security Tier</div>
-                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.1rem",color:"#fff",letterSpacing:"0.08em"}}>L5 CLEARANCE</div>
-                  </div>
-                  <div style={{background:"#0a0c0f",border:"1px solid rgba(255,107,74,0.15)",padding:"0.75rem",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                    <div style={{width:"100%",height:"90px",backgroundImage:"radial-gradient(circle,rgba(255,107,74,0.5) 1px,transparent 1px)",backgroundSize:"10px 10px",opacity:0.4,borderRadius:"2px"}}></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
+        
         {/* DATASET */}
         <section className="section dataset-section">
           <div className="section-inner">
@@ -399,25 +354,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* CTA */}
-        <section className="cta-section">
-          <div className="cta-bg"></div>
-          <div style={{position:"relative",zIndex:1}}>
-            <div className="cta-eyebrow">Ready to Deploy Intel?</div>
-            <h2 className="cta-title">ACCESS THE MOST<br/>SOPHISTICATED FORENSIC<br/>ARCHITECTURE</h2>
-            <p className="cta-desc">Access interactive dashboards, GIS maps, and predictive analytics to understand and forecast crime trends.</p>
-            {isAuthenticated ? (
-              <div className="cta-btns">
-                <a href="/dashboard" className="btn-primary">View Dashboard</a>
-                <a href="/map" className="btn-secondary">View Map</a>
-              </div>
-            ) : (
-              <div className="cta-btns">
-                <a href={getLoginUrl()} className="btn-primary">Initiate Protocol</a>
-              </div>
-            )}
-          </div>
-        </section>
+        
 
         {/* FOOTER */}
         <footer>
