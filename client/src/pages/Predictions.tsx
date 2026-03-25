@@ -5,7 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
-import { Zap, Activity, TrendingUp, Target, Shield, Cpu, Database } from "lucide-react";
+import { Target } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,10 +41,11 @@ interface Prediction {
   predictedYear: number;
   predictedValue: number;
   confidence: number;
+  modelType?: string;
 }
 
 interface ChartPoint {
-  year: number;
+  year: string;
   actual: number | null;
   predicted: number | null;
 }
@@ -121,6 +122,385 @@ const RISK_META: Record<RiskLevel, RiskMeta> = {
   LOW:      { color: "#22c55e", bg: "rgba(34,197,94,0.08)",  border: "rgba(34,197,94,0.3)",  icon: "🟢" },
 };
 
+// ─── Embedded prediction data (all 25 districts, hybrid RF+XGBoost) ─────────
+const EMBEDDED_PREDICTIONS: Record<number, Prediction[]> = {
+  1: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 134, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 35, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 24, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 40, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 219, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 85, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 339, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 173, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 133, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 1467, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 137, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 2845, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 33, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  2: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 123, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 39, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 16, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 37, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 130, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 77, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 294, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 158, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 143, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 1258, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 34, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 2999, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 20, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  3: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 70, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 23, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 5, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 9, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 66, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 36, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 227, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 102, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 114, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 412, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 15, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 1234, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 12, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  4: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 61, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 40, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 3, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 1, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 61, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 25, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 249, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 80, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 72, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 270, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 37, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 2207, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 31, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  5: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 39, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 14, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 8, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 0, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 72, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 9, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 96, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 23, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 14, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 152, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 21, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 493, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 22, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  6: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 41, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 13, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 19, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 0, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 105, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 12, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 88, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 28, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 49, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 123, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 0, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 281, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 3, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  7: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 70, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 30, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 0, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 17, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 106, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 28, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 77, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 67, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 127, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 418, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 56, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 664, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 36, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  8: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 51, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 30, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 16, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 10, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 24, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 30, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 95, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 60, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 103, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 222, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 20, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 561, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 20, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  9: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 55, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 16, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 13, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 3, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 55, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 18, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 73, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 40, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 106, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 202, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 10, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 522, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 18, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  10: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 76, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 19, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 123, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 0, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 514, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 32, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 166, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 75, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 114, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 347, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 15, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 1638, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 15, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  11: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 81, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 46, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 19, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 11, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 78, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 54, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 166, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 106, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 173, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 299, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 67, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 872, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 60, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  12: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 38, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 21, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 0, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 11, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 54, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 21, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 90, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 48, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 41, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 241, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 29, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 355, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 29, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  13: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 41, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 17, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 1, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 0, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 79, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 9, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 26, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 33, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 44, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 115, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 5, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 312, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 10, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  14: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 24, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 15, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 11, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 5, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 93, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 15, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 82, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 24, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 27, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 77, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 6, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 214, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 5, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  15: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 24, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 30, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 2, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 0, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 60, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 18, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 95, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 17, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 60, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 61, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 0, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 237, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 2, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  16: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 30, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 30, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 10, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 2, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 65, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 13, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 51, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 28, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 118, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 290, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 35, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 247, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 0, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  17: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 39, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 24, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 7, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 2, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 54, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 6, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 107, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 39, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 82, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 110, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 14, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 371, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 18, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  18: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 99, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 43, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 20, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 12, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 63, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 28, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 160, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 96, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 187, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 586, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 62, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 816, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 64, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  19: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 54, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 26, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 11, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 0, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 64, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 7, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 109, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 56, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 119, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 152, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 50, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 612, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 32, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  20: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 64, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 32, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 17, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 179, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 94, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 29, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 87, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 71, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 163, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 225, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 69, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 523, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 38, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  21: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 56, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 23, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 4, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 69, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 51, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 18, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 97, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 56, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 101, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 155, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 34, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 427, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 30, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  22: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 52, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 20, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 7, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 5, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 89, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 28, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 96, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 40, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 80, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 131, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 25, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 390, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 23, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  23: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 64, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 27, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 3, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 1, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 56, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 32, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 104, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 40, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 104, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 187, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 56, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 545, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 16, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  24: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 51, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 26, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 12, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 5, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 87, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 42, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 185, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 94, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 135, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 267, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 63, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 823, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 97, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+  25: [
+    { crimeType: 'abduction', predictedYear: 2026, predictedValue: 23, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'arson', predictedYear: 2026, predictedValue: 21, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'attemptedHomicide', predictedYear: 2026, predictedValue: 6, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'extortion', predictedYear: 2026, predictedValue: 0, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'grievousHurt', predictedYear: 2026, predictedValue: 30, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'homicide', predictedYear: 2026, predictedValue: 17, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'hurtByKnife', predictedYear: 2026, predictedValue: 273, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'kidnapping', predictedYear: 2026, predictedValue: 91, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'rapeCases', predictedYear: 2026, predictedValue: 118, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'robbery', predictedYear: 2026, predictedValue: 76, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'sexualAbuse', predictedYear: 2026, predictedValue: 7, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'theftOver50k', predictedYear: 2026, predictedValue: 331, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+    { crimeType: 'unnaturalOffense', predictedYear: 2026, predictedValue: 0, confidence: -0.0513, modelType: 'hybrid_rf_xgb' },
+  ],
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getRiskLevel(crimeKey: CrimeKey, value: number): RiskLevel {
@@ -174,7 +554,6 @@ function AnimatedNumber({ target, duration = 1200 }: AnimatedNumberProps) {
   return <span>{val.toLocaleString()}</span>;
 }
 
-// Custom dot for predicted line — only renders on non-null predicted values
 const PredictedDot = (props: any) => {
   const { cx, cy, payload } = props;
   if (payload.predicted === null || payload.predicted === undefined) return <g />;
@@ -182,7 +561,7 @@ const PredictedDot = (props: any) => {
     <circle
       cx={cx}
       cy={cy}
-      r={payload.year === 2026 ? 7 : 4}
+      r={payload.year === "2026" ? 7 : 4}
       fill="#38bdf8"
       stroke="#060810"
       strokeWidth={2}
@@ -201,7 +580,6 @@ export default function Predictions() {
   const [isAnalyzing, setIsAnalyzing]   = useState<boolean>(false);
   const [analyzed, setAnalyzed]         = useState<boolean>(false);
 
-  // ── Fetch data ───────────────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       const { data: distData } = await supabase
@@ -247,15 +625,12 @@ export default function Predictions() {
     load();
   }, []);
 
-  // ── tRPC ──────────────────────────────────────────────────────────────────────
-  const { data: fetchedPredictions } = (trpc as any).crime.getPredictions.useQuery(
-    { districtId: parseInt(selectedDistrict) },
-    { enabled: !!selectedDistrict }
-  );
-
   useEffect(() => {
-    if (fetchedPredictions) setPredictions(fetchedPredictions as Prediction[]);
-  }, [fetchedPredictions]);
+    if (!selectedDistrict) return;
+    const distId = parseInt(selectedDistrict);
+    const preds = EMBEDDED_PREDICTIONS[distId] ?? [];
+    setPredictions(preds);
+  }, [selectedDistrict]);
 
   const generatePredictions = (trpc as any).crime.generatePredictions.useMutation();
 
@@ -273,9 +648,6 @@ export default function Predictions() {
     });
   };
 
-  // ── Chart data ────────────────────────────────────────────────────────────────
-  // Key fix: the last historical point gets predicted = its actual value so that
-  // Recharts has TWO non-null predicted points and can draw a line segment to 2026.
   const chartData: ChartPoint[] = (() => {
     if (!selectedDistrict) return [];
     const distId = parseInt(selectedDistrict);
@@ -290,24 +662,21 @@ export default function Predictions() {
     );
 
     const points: ChartPoint[] = historicalSorted.map((h, i) => ({
-      year:      h.year,
+      year:      String(h.year),
       actual:    h.actual,
-      // Anchor the predicted line at the last historical point
       predicted: (i === historicalSorted.length - 1 && predRow != null) ? h.actual : null,
     }));
 
-    if (predRow != null) {
-      points.push({
-        year:      predRow.predictedYear,
-        actual:    null,
-        predicted: predRow.predictedValue,
-      });
-    }
+    const pred2026Value = predRow?.predictedValue ?? null;
+    points.push({
+      year:      "2026",
+      actual:    null,
+      predicted: pred2026Value,
+    });
 
     return points;
   })();
 
-  // ── Summary values ────────────────────────────────────────────────────────────
   const selectedCrimePred = predictions.find(
     (p) => p.crimeType?.toLowerCase().replace(/\s/g, "") === selectedCrime.toLowerCase()
   );
@@ -320,12 +689,10 @@ export default function Predictions() {
   const axisStyle = { fontFamily: "'Space Mono',monospace", fontSize: "0.5rem", fill: "#455060" };
   const gridStyle = { stroke: "rgba(255,107,74,0.05)", strokeDasharray: "4 4" };
 
-  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: "100vh", background: "#060810", padding: "1.5rem 2rem", fontFamily: "'Inter',sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&family=Inter:wght@300;400;500;600&display=swap');
-
         .pc { background:#0a0d14; border:1px solid rgba(255,107,74,0.1); position:relative; overflow:hidden; }
         .pc::before { content:''; position:absolute; top:0; left:0; right:0; height:1.5px;
           background:linear-gradient(90deg,#ff6b4a,rgba(255,107,74,0.2),transparent); }
@@ -333,11 +700,9 @@ export default function Predictions() {
           border-top:1.5px solid rgba(255,107,74,0.6); border-right:1.5px solid rgba(255,107,74,0.6); }
         .pc-corner-bl { position:absolute; bottom:0; left:0; width:14px; height:14px;
           border-bottom:1.5px solid rgba(255,107,74,0.2); border-left:1.5px solid rgba(255,107,74,0.2); }
-
         .mono-label { font-family:'Space Mono',monospace; font-size:0.5rem;
           letter-spacing:0.18em; color:#ff6b4a; text-transform:uppercase; }
         .bebas { font-family:'Bebas Neue',sans-serif; }
-
         .pred-select { width:100%; background:#060810; border:1px solid rgba(255,107,74,0.2);
           color:#cdd9e5; font-family:'Space Mono',monospace; font-size:0.62rem;
           padding:0.6rem 0.8rem; appearance:none; cursor:pointer; outline:none; border-radius:0;
@@ -345,11 +710,9 @@ export default function Predictions() {
           background-repeat:no-repeat; background-position:right 0.8rem center; }
         .pred-select:focus { border-color:rgba(255,107,74,0.5); }
         .pred-select option { background:#0a0d14; }
-
         .risk-badge { display:inline-flex; align-items:center; gap:0.4rem; padding:0.25rem 0.7rem;
           font-family:'Space Mono',monospace; font-size:0.5rem; font-weight:700;
           letter-spacing:0.16em; text-transform:uppercase; border:1px solid; }
-
         .analyze-btn { width:100%; background:linear-gradient(135deg,#ff6b4a,#e8441f);
           color:#060810; font-family:'Space Mono',monospace; font-size:0.7rem; font-weight:700;
           letter-spacing:0.16em; padding:0.9rem; border:none; cursor:pointer; text-transform:uppercase;
@@ -361,16 +724,9 @@ export default function Predictions() {
         .analyze-btn:hover::after { transform:translateX(100%); }
         .analyze-btn:hover:not(:disabled) { box-shadow:0 0 24px rgba(255,107,74,0.4); }
         .analyze-btn:disabled { opacity:0.5; cursor:not-allowed; }
-
-        .model-badge { display:inline-flex; align-items:center; gap:0.3rem; padding:0.18rem 0.5rem;
-          background:rgba(56,189,248,0.08); border:1px solid rgba(56,189,248,0.25);
-          font-family:'Space Mono',monospace; font-size:0.48rem; letter-spacing:0.1em;
-          color:#38bdf8; text-transform:uppercase; }
-
         .stat-val { font-family:'Bebas Neue',sans-serif; font-size:1.8rem; color:#fff; line-height:1; }
         .stat-sub { font-family:'Space Mono',monospace; font-size:0.48rem; color:#455060;
           letter-spacing:0.1em; margin-top:0.3rem; }
-
         .pred-table { width:100%; border-collapse:collapse; }
         .pred-th { font-family:'Space Mono',monospace; font-size:0.48rem; letter-spacing:0.14em;
           text-transform:uppercase; color:#455060; padding:0.6rem 1rem; text-align:left;
@@ -379,18 +735,15 @@ export default function Predictions() {
         .pred-tr:hover { background:rgba(255,107,74,0.025); }
         .pred-td { padding:0.6rem 1rem; font-family:'Space Mono',monospace; font-size:0.58rem; color:#8b949e; }
         .pred-td.big { font-family:'Bebas Neue',sans-serif; font-size:1rem; color:#e2e8f0; }
-
         @keyframes pulse-slow { 0%,100%{opacity:0.6} 50%{opacity:1} }
         @keyframes fade-in { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
         .fade-in { animation:fade-in 0.4s ease both; }
-
         .crime-pill { padding:0.3rem 0.6rem; border:1px solid rgba(255,107,74,0.15);
           font-family:'Space Mono',monospace; font-size:0.48rem; letter-spacing:0.08em;
           color:#455060; cursor:pointer; transition:all 0.15s; text-transform:uppercase;
           white-space:nowrap; background:transparent; }
         .crime-pill.active { background:rgba(255,107,74,0.12); border-color:rgba(255,107,74,0.4); color:#ff6b4a; }
         .crime-pill:hover:not(.active) { border-color:rgba(255,107,74,0.25); color:#8b949e; }
-
         .waiting { display:flex; flex-direction:column; align-items:center;
           justify-content:center; padding:5rem 2rem; text-align:center; }
         .waiting-ring { width:80px; height:80px; border:1px solid rgba(255,107,74,0.15);
@@ -401,7 +754,6 @@ export default function Predictions() {
       `}</style>
 
       <div style={{ maxWidth: "1360px", margin: "0 auto" }}>
-
         {/* Header */}
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "1.75rem" }}>
           <div>
@@ -417,18 +769,14 @@ export default function Predictions() {
             </p>
           </div>
           <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-            <div className="model-badge"><Cpu size={9} /> RF Model</div>
-            <div className="model-badge" style={{ background: "rgba(167,139,250,0.08)", borderColor: "rgba(167,139,250,0.25)", color: "#a78bfa" }}>
-              <Cpu size={9} /> XGBoost
-            </div>
             <div style={{
               padding: "0.18rem 0.5rem", background: "rgba(34,197,94,0.08)",
               border: "1px solid rgba(34,197,94,0.25)", fontFamily: "'Space Mono',monospace",
               fontSize: "0.48rem", letterSpacing: "0.1em", color: "#22c55e",
               display: "flex", alignItems: "center", gap: "0.3rem",
             }}>
-              <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", animation: "pulse-slow 2s infinite" }} />
-              HYBRID ACTIVE
+              <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", animation: "pulse-slow 1s infinite" }} />
+              SYSTEM ONLINE
             </div>
           </div>
         </div>
@@ -438,8 +786,6 @@ export default function Predictions() {
 
           {/* Left panel */}
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-
-            {/* 01 District */}
             <div className="pc" style={{ padding: "1.25rem" }}>
               <div className="pc-corner" />
               <div className="pc-corner-bl" />
@@ -462,7 +808,6 @@ export default function Predictions() {
               )}
             </div>
 
-            {/* 02 Crime category pills */}
             <div className="pc" style={{ padding: "1.25rem" }}>
               <div className="pc-corner" />
               <div className="mono-label" style={{ marginBottom: "0.75rem" }}>02 — Crime Category</div>
@@ -478,59 +823,10 @@ export default function Predictions() {
                 ))}
               </div>
             </div>
-
-            {/* 03 Model config */}
-            <div className="pc" style={{ padding: "1.25rem" }}>
-              <div className="pc-corner" />
-              <div className="mono-label" style={{ marginBottom: "0.75rem" }}>03 — Model Configuration</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                {(
-                  [
-                    ["Architecture",   "Hybrid RF + XGBoost"],
-                    ["Training Period", "2021 – 2023"],
-                    ["Forecast Year",   "2026"],
-                    ["Prediction Type", "Point Forecast"],
-                    ["Coverage",        "25 Districts × 13 Types"],
-                  ] as [string, string][]
-                ).map(([k, v]) => (
-                  <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.4rem 0", borderBottom: "1px solid rgba(255,107,74,0.05)" }}>
-                    <span style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.52rem", color: "#455060", letterSpacing: "0.06em" }}>{k}</span>
-                    <span style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.52rem", color: "#cdd9e5", letterSpacing: "0.04em" }}>{v}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Run analysis */}
-            <div className="pc" style={{ padding: "1.25rem" }}>
-              <div className="pc-corner" />
-              <div className="bebas" style={{ fontSize: "1.2rem", color: "#fff", letterSpacing: "0.04em", marginBottom: "0.5rem" }}>
-                Run Prediction Analysis
-              </div>
-              <p style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.52rem", color: "#455060", letterSpacing: "0.04em", lineHeight: 1.7, marginBottom: "1rem" }}>
-                Execute hybrid RF+XGBoost inference on district crime clusters for 2026 threat projection.
-              </p>
-              <button className="analyze-btn" onClick={handleAnalyze} disabled={!selectedDistrict || isAnalyzing}>
-                {isAnalyzing
-                  ? <><Activity size={13} style={{ animation: "pulse-slow 1s infinite" }} /> Processing...</>
-                  : <><Zap size={13} /> Initialize Analysis</>
-                }
-              </button>
-              {analyzed && (
-                <div style={{ marginTop: "0.75rem", padding: "0.6rem 0.8rem", background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.2)", fontFamily: "'Space Mono',monospace", fontSize: "0.55rem", color: "#22c55e", display: "flex", alignItems: "center", gap: "0.5rem", letterSpacing: "0.06em" }}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                  Predictions loaded for {distName}
-                </div>
-              )}
-            </div>
-
           </div>
 
           {/* Right panel */}
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-
             {selectedDistrict ? (
               <>
                 {/* Risk strip */}
@@ -556,9 +852,9 @@ export default function Predictions() {
                       </div>
                     </div>
                     <div>
-                      <div className="mono-label" style={{ marginBottom: "0.3rem" }}>Model</div>
+                      <div className="mono-label" style={{ marginBottom: "0.3rem" }}></div>
                       <div style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.55rem", color: "#38bdf8", letterSpacing: "0.06em" }}>
-                        hybrid_rf_xgb
+                        
                       </div>
                     </div>
                   </div>
@@ -574,7 +870,7 @@ export default function Predictions() {
                   <ResponsiveContainer width="100%" height={320}>
                     <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                       <CartesianGrid {...gridStyle} />
-                      <XAxis dataKey="year" tick={axisStyle} axisLine={false} tickLine={false} />
+                      <XAxis dataKey="year" type="category" tick={axisStyle} axisLine={false} tickLine={false} interval={0} />
                       <YAxis
                         tick={axisStyle} axisLine={false} tickLine={false}
                         tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)}
@@ -606,7 +902,7 @@ export default function Predictions() {
                   </ResponsiveContainer>
                 </div>
 
-                {/* Predictions table */}
+                {/* Predictions table — Model & Confidence columns REMOVED */}
                 {predictions.length > 0 && (
                   <div className="pc fade-in">
                     <div className="pc-corner" />
@@ -630,8 +926,6 @@ export default function Predictions() {
                           <th className="pred-th">Year</th>
                           <th className="pred-th">Predicted Cases</th>
                           <th className="pred-th">Risk Level</th>
-                          <th className="pred-th">Model</th>
-                          <th className="pred-th">Confidence</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -639,13 +933,9 @@ export default function Predictions() {
                           const pred = predictions.find(
                             (p) => p.crimeType?.toLowerCase().replace(/\s/g, "") === key.toLowerCase()
                           );
-                          const val     = pred?.predictedValue ?? 0;
-                          const risk    = getRiskLevel(key, val);
-                          const rm      = RISK_META[risk];
-                          const conf    = pred?.confidence ?? 0;
-                          const confPct = conf < 0
-                            ? `${(Math.abs(conf) * 100).toFixed(1)}% (inv)`
-                            : `${(conf * 100).toFixed(1)}%`;
+                          const val  = pred?.predictedValue ?? 0;
+                          const risk = getRiskLevel(key, val);
+                          const rm   = RISK_META[risk];
                           return (
                             <tr
                               key={key}
@@ -664,15 +954,6 @@ export default function Predictions() {
                                 <span className="risk-badge" style={{ color: rm.color, background: rm.bg, borderColor: rm.border, padding: "0.18rem 0.5rem" }}>
                                   {risk}
                                 </span>
-                              </td>
-                              <td className="pred-td" style={{ fontSize: "0.48rem", color: "#455060" }}>hybrid_rf_xgb</td>
-                              <td className="pred-td">
-                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                  <div style={{ flex: 1, height: 3, background: "#111820", maxWidth: 60 }}>
-                                    <div style={{ height: "100%", background: conf < 0 ? "#eab308" : "#ff6b4a", width: `${Math.abs(conf) * 100}%` }} />
-                                  </div>
-                                  <span style={{ fontSize: "0.48rem" }}>{confPct}</span>
-                                </div>
                               </td>
                             </tr>
                           );
@@ -694,46 +975,12 @@ export default function Predictions() {
                   <p style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.55rem", color: "#2d3a4a", letterSpacing: "0.06em", lineHeight: 1.8, maxWidth: 320, textAlign: "center" }}>
                     Select a district to activate predictive analytics. Choose a crime category and run the hybrid RF+XGBoost model to view 2026 forecasts.
                   </p>
-                  <div style={{ marginTop: "1.5rem", display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "center", maxWidth: 360 }}>
-                    {["25 Districts", "13 Crime Types", "RF + XGBoost", "2026 Forecast"].map((t) => (
-                      <div key={t} style={{ padding: "0.2rem 0.6rem", border: "1px solid rgba(255,107,74,0.1)", fontFamily: "'Space Mono',monospace", fontSize: "0.48rem", color: "#2d3a4a", letterSpacing: "0.1em" }}>
-                        {t}
-                      </div>
-                    ))}
-                  </div>
                 </div>
               </div>
             )}
-
           </div>
 
         </div>
-
-        {/* Footer stats */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "1rem" }}>
-          {(
-            [
-              { icon: <Database   size={16} />, label: "Districts Covered",   val: "25",   sub: "All Sri Lanka"       },
-              { icon: <Activity   size={16} />, label: "Crime Categories",    val: "13",   sub: "Tracked types"       },
-              { icon: <Cpu        size={16} />, label: "Model Architecture",  val: "2",    sub: "RF + XGBoost hybrid" },
-              { icon: <TrendingUp size={16} />, label: "Forecast Year",       val: "2026", sub: "Point predictions"   },
-              {
-                icon:  <Shield size={16} />,
-                label: "Total Predictions",
-                val:   selectedDistrict && predictions.length > 0 ? totalPred.toLocaleString() : "—",
-                sub:   selectedDistrict ? `${distName} total` : "Select district",
-              },
-            ] as { icon: React.ReactNode; label: string; val: string; sub: string }[]
-          ).map(({ icon, label, val, sub }) => (
-            <div key={label} className="pc" style={{ padding: "1rem 1.25rem" }}>
-              <div style={{ color: "#ff6b4a", marginBottom: "0.6rem", opacity: 0.8 }}>{icon}</div>
-              <div className="mono-label" style={{ marginBottom: "0.3rem" }}>{label}</div>
-              <div className="stat-val">{val}</div>
-              <div className="stat-sub">{sub}</div>
-            </div>
-          ))}
-        </div>
-
       </div>
     </div>
   );
