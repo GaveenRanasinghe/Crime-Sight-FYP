@@ -428,27 +428,7 @@ export default function Dashboard() {
         {/* Charts row */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
 
-          {/* Line chart */}
-          <div className="db-card" style={{ padding: "1.5rem" }}>
-            <div className="db-card-corner" />
-            <div className="db-section-label">Year-over-Year</div>
-            <div className="db-section-title">Crime Trend</div>
-            <div className="db-section-sub">Total crimes by year across all districts</div>
-            <div style={{ marginTop: "1.25rem" }}>
-              <ResponsiveContainer width="100%" height={260}>
-                <LineChart data={yearData}>
-                  <CartesianGrid {...gridStyle} />
-                  <XAxis dataKey="year" tick={axisStyle} axisLine={false} tickLine={false} />
-                  <YAxis tick={axisStyle} axisLine={false} tickLine={false}
-                    tickFormatter={(v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} />
-                  <Tooltip content={<SentinelTooltip />} />
-                  <Legend wrapperStyle={{ fontFamily: "'Space Mono',monospace", fontSize: "0.55rem", color: "#8b949e" }} />
-                  <Line type="monotone" dataKey="total"   stroke="#ff6b4a" strokeWidth={2} name="Total Crimes"         dot={{ fill: "#ff6b4a", r: 4 }} activeDot={{ r: 6 }} />
-                  <Line type="monotone" dataKey="average" stroke="#38bdf8" strokeWidth={2} name="Average per District" dot={{ fill: "#38bdf8", r: 4 }} activeDot={{ r: 6 }} strokeDasharray="4 2" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+         
 
           {/* Pie chart */}
           <div className="db-card" style={{ padding: "1.5rem" }}>

@@ -6,6 +6,11 @@ import db
 import analytics
 from auth import create_token, require_auth, require_admin, verify_token
 import traceback
+import joblib
+
+# Load ML model
+model = joblib.load("rf_model.pkl")
+df_percent = joblib.load("df_percent.pkl")
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
@@ -477,6 +482,53 @@ def health():
     """Health check endpoint."""
     return jsonify({"status": "ok"}), 200
 
+@app.route("/api/crime/classify/<district_name>", methods=["GET"])
+def classify_district(district_name):
+    try:
+        matched_district = None
+
+        for col in df_percent.columns:
+            if col.lower() == district_name.lower():
+                matched_district = col
+                break
+
+        if matched_district is None:
+            return jsonify({
+                "error": "District not found",
+                "availableDistricts": list(df_percent.columns)
+            }), 404
+
+        X_model = df_percent.T
+        district_data = X_model.loc[[matched_district]]
+
+        probs = model.predict_proba(district_data)[0]
+
+        probability_result = {
+            str(model.classes_[i]): round(float(probs[i] * 100), 2)
+            for i in range(len(model.classes_))
+        }
+
+        max_index = probs.argmax()
+
+        category_breakdown = (
+            df_percent[matched_district]
+            .sort_values(ascending=False)
+            .round(2)
+            .to_dict()
+        )
+
+        return jsonify({
+            "district": matched_district,
+            "predictedRisk": str(model.classes_[max_index]),
+            "confidence": round(float(probs[max_index] * 100), 2),
+            "probabilities": probability_result,
+            "categoryBreakdown": category_breakdown
+        }), 200
+
+    except Exception as e:
+        print("Classification error:", e)
+        traceback.print_exc()
+        return jsonify({"error": "Prediction failed"}), 500
 
 if __name__ == "__main__":
     app.run(host=config.HOST, port=config.PORT, debug=config.DEBUG)
