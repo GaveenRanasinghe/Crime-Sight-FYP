@@ -1,11 +1,7 @@
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { supabase } from "@/lib/supabase";
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer,
-} from "recharts";
-import { Target } from "lucide-react";
+import { Target, Database, AlertTriangle, TrendingUp, Crosshair, BarChart3 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -518,12 +514,12 @@ const SentinelTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   return (
     <div style={{
       background: "#0d1117",
-      border: "1px solid rgba(255,107,74,0.3)",
+      border: "1px solid rgba(255,122,24,0.3)",
       padding: "0.7rem 1rem",
       fontFamily: "'Space Mono',monospace",
       boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
     }}>
-      <div style={{ fontSize: "0.52rem", color: "#ff6b4a", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
+      <div style={{ fontSize: "0.52rem", color: "#ff7a18", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.4rem" }}>
         {label}
       </div>
       {payload.map((p, i) => (
@@ -579,6 +575,7 @@ export default function Predictions() {
   const [predictions, setPredictions]   = useState<Prediction[]>([]);
   const [isAnalyzing, setIsAnalyzing]   = useState<boolean>(false);
   const [analyzed, setAnalyzed]         = useState<boolean>(false);
+  const [isDistrictOpen, setDistrictOpen] = useState<boolean>(false);
 
   useEffect(() => {
     const load = async () => {
@@ -687,301 +684,263 @@ export default function Predictions() {
   const totalPred = predictions.reduce((s, p) => s + (p.predictedValue ?? 0), 0);
 
   const axisStyle = { fontFamily: "'Space Mono',monospace", fontSize: "0.5rem", fill: "#455060" };
-  const gridStyle = { stroke: "rgba(255,107,74,0.05)", strokeDasharray: "4 4" };
+  const gridStyle = { stroke: "rgba(255,122,24,0.05)", strokeDasharray: "4 4" };
+
+  const sortedPredictions = [...predictions].sort((a, b) => (b.predictedValue ?? 0) - (a.predictedValue ?? 0));
+  const topThree = sortedPredictions.slice(0, 3);
+  const selectedContribution = totalPred > 0 ? Math.round((predValue / totalPred) * 100) : 0;
+  const selectedRank = Math.max(1, sortedPredictions.findIndex((p) => p.crimeType === selectedCrime) + 1);
+  const historicalLatest = chartData.filter((p) => p.actual !== null).at(-1)?.actual ?? 0;
+  const changePercent = historicalLatest > 0 ? Math.round(((predValue - historicalLatest) / historicalLatest) * 100) : 0;
+  const chartBars = chartData.map((p) => ({
+    ...p,
+    bar: p.predicted ?? p.actual ?? 0,
+    type: p.predicted !== null ? "Forecast" : "Observed",
+  }));
+  const maxBar = Math.max(...chartBars.map((p) => p.bar), 1);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#060810", padding: "1.5rem 2rem", fontFamily: "'Inter',sans-serif" }}>
+    <div className="sentinel-page">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&family=Inter:wght@300;400;500;600&display=swap');
-        .pc { background:#0a0d14; border:1px solid rgba(255,107,74,0.1); position:relative; overflow:hidden; }
-        .pc::before { content:''; position:absolute; top:0; left:0; right:0; height:1.5px;
-          background:linear-gradient(90deg,#ff6b4a,rgba(255,107,74,0.2),transparent); }
-        .pc-corner { position:absolute; top:0; right:0; width:14px; height:14px;
-          border-top:1.5px solid rgba(255,107,74,0.6); border-right:1.5px solid rgba(255,107,74,0.6); }
-        .pc-corner-bl { position:absolute; bottom:0; left:0; width:14px; height:14px;
-          border-bottom:1.5px solid rgba(255,107,74,0.2); border-left:1.5px solid rgba(255,107,74,0.2); }
-        .mono-label { font-family:'Space Mono',monospace; font-size:0.5rem;
-          letter-spacing:0.18em; color:#ff6b4a; text-transform:uppercase; }
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&display=swap');
+        :root { --accent:#ff7a18; --accent-2:#ff7a18; --bg:#0b0b0c; --panel:#161616; --panel-2:#1f1f1f; --muted:#8b8b8b; --line:rgba(255,255,255,.08); --green:#00f0a0; --yellow:#f8d66d; }
+        .sentinel-page { min-height:100vh; background:#0a0a0b; color:#fff; font-family:'Inter',sans-serif; overflow:hidden; }
+        .sentinel-page * { box-sizing:border-box; }
         .bebas { font-family:'Bebas Neue',sans-serif; }
-        .pred-select { width:100%; background:#060810; border:1px solid rgba(255,107,74,0.2);
-          color:#cdd9e5; font-family:'Space Mono',monospace; font-size:0.62rem;
-          padding:0.6rem 0.8rem; appearance:none; cursor:pointer; outline:none; border-radius:0;
-          background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23ff6b4a'/%3E%3C/svg%3E");
-          background-repeat:no-repeat; background-position:right 0.8rem center; }
-        .pred-select:focus { border-color:rgba(255,107,74,0.5); }
-        .pred-select option { background:#0a0d14; }
-        .risk-badge { display:inline-flex; align-items:center; gap:0.4rem; padding:0.25rem 0.7rem;
-          font-family:'Space Mono',monospace; font-size:0.5rem; font-weight:700;
-          letter-spacing:0.16em; text-transform:uppercase; border:1px solid; }
-        .analyze-btn { width:100%; background:linear-gradient(135deg,#ff6b4a,#e8441f);
-          color:#060810; font-family:'Space Mono',monospace; font-size:0.7rem; font-weight:700;
-          letter-spacing:0.16em; padding:0.9rem; border:none; cursor:pointer; text-transform:uppercase;
-          display:flex; align-items:center; justify-content:center; gap:0.5rem;
-          transition:all 0.2s; position:relative; overflow:hidden; }
-        .analyze-btn::after { content:''; position:absolute; inset:0;
-          background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
-          transform:translateX(-100%); transition:transform 0.4s; }
-        .analyze-btn:hover::after { transform:translateX(100%); }
-        .analyze-btn:hover:not(:disabled) { box-shadow:0 0 24px rgba(255,107,74,0.4); }
-        .analyze-btn:disabled { opacity:0.5; cursor:not-allowed; }
-        .stat-val { font-family:'Bebas Neue',sans-serif; font-size:1.8rem; color:#fff; line-height:1; }
-        .stat-sub { font-family:'Space Mono',monospace; font-size:0.48rem; color:#455060;
-          letter-spacing:0.1em; margin-top:0.3rem; }
-        .pred-table { width:100%; border-collapse:collapse; }
-        .pred-th { font-family:'Space Mono',monospace; font-size:0.48rem; letter-spacing:0.14em;
-          text-transform:uppercase; color:#455060; padding:0.6rem 1rem; text-align:left;
-          border-bottom:1px solid rgba(255,107,74,0.08); background:#080b12; }
-        .pred-tr { border-bottom:1px solid rgba(255,107,74,0.04); transition:background 0.15s; cursor:pointer; }
-        .pred-tr:hover { background:rgba(255,107,74,0.025); }
-        .pred-td { padding:0.6rem 1rem; font-family:'Space Mono',monospace; font-size:0.58rem; color:#8b949e; }
-        .pred-td.big { font-family:'Bebas Neue',sans-serif; font-size:1rem; color:#e2e8f0; }
-        @keyframes pulse-slow { 0%,100%{opacity:0.6} 50%{opacity:1} }
-        @keyframes fade-in { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
-        .fade-in { animation:fade-in 0.4s ease both; }
-        .crime-pill { padding:0.3rem 0.6rem; border:1px solid rgba(255,107,74,0.15);
-          font-family:'Space Mono',monospace; font-size:0.48rem; letter-spacing:0.08em;
-          color:#455060; cursor:pointer; transition:all 0.15s; text-transform:uppercase;
-          white-space:nowrap; background:transparent; }
-        .crime-pill.active { background:rgba(255,107,74,0.12); border-color:rgba(255,107,74,0.4); color:#ff6b4a; }
-        .crime-pill:hover:not(.active) { border-color:rgba(255,107,74,0.25); color:#8b949e; }
-        .waiting { display:flex; flex-direction:column; align-items:center;
-          justify-content:center; padding:5rem 2rem; text-align:center; }
-        .waiting-ring { width:80px; height:80px; border:1px solid rgba(255,107,74,0.15);
-          display:flex; align-items:center; justify-content:center;
-          margin-bottom:1.5rem; position:relative; }
-        .waiting-ring::before { content:''; position:absolute; inset:-4px;
-          border:1px solid rgba(255,107,74,0.06); }
+        .mono { font-family:'Space Mono',monospace; }
+        .sentinel-side { background:#181818; border-right:1px solid var(--line); min-height:100vh; display:flex; flex-direction:column; padding:22px 16px; }
+        .brand { font-size:1.75rem; font-weight:800; letter-spacing:-.06em; margin-bottom:28px; }
+        .suite { display:flex; align-items:center; gap:14px; padding:12px 14px; margin-bottom:28px; }
+        .suite-icon { width:38px; height:38px; background:var(--accent); color:#111; display:grid; place-items:center; border-radius:4px; }
+        .suite-title { font-family:'Space Mono',monospace; font-size:.78rem; font-weight:700; letter-spacing:.18em; }
+        .suite-sub { font-size:.62rem; color:#777; margin-top:2px; text-transform:uppercase; }
+        .side-nav { display:flex; flex-direction:column; gap:8px; }
+        .side-item { display:flex; align-items:center; gap:14px; padding:14px 16px; color:#8b8b8b; font-size:.85rem; border-left:3px solid transparent; }
+        .side-item.active { color:#ffb46b; background:rgba(255,122,24,.12); border-left-color:var(--accent); }
+        .side-spacer { flex:1; }
+        .report-btn { width:100%; border:0; background:#2a2a2a; color:#ffb46b; padding:14px; border-radius:7px; font-family:'Space Mono',monospace; font-weight:700; letter-spacing:.14em; font-size:.7rem; text-transform:uppercase; }
+        .side-foot { color:#777; font-size:.75rem; display:flex; flex-direction:column; gap:16px; margin-top:28px; }
+        .main { min-width:0; background:radial-gradient(circle at 35% 0%, rgba(255,122,24,.04), transparent 36%), #0b0b0c; }
+        .topbar { height:64px; background:#151515; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; padding:0 28px; }
+        .top-tabs { display:flex; align-items:center; gap:30px; height:100%; }
+        .top-tab { height:100%; display:flex; align-items:center; color:#8f8f8f; font-family:'Space Mono',monospace; font-size:.75rem; letter-spacing:.14em; text-transform:uppercase; border-bottom:2px solid transparent; }
+        .top-tab.active { color:#ffb46b; border-bottom-color:var(--accent); }
+        .query { width:270px; height:32px; background:#242424; border:1px solid var(--line); color:#777; border-radius:3px; display:flex; align-items:center; padding:0 12px; gap:9px; font-size:.72rem; }
+        .emergency { background:var(--accent); color:#111; border:0; height:36px; padding:0 18px; border-radius:3px; font-weight:800; font-size:.7rem; text-transform:uppercase; }
+        .content { padding:28px 52px 48px; width:100%; }
+        .hero-grid { display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:24px; align-items:start; }
+        .eyebrow { font-family:'Space Mono',monospace; color:#bfbfbf; letter-spacing:.32em; text-transform:uppercase; font-size:.78rem; margin-top:6px; }
+        .title { font-family:'Bebas Neue',sans-serif; font-size:clamp(3rem, 5.2vw, 5rem); line-height:.92; margin:28px 0 8px; letter-spacing:-.02em; }
+        .title span { color:var(--accent); }
+        .subtitle { font-family:'Space Mono',monospace; letter-spacing:.3em; text-transform:uppercase; color:#b9b9b9; font-size:.78rem; }
+        .district-card,.panel,.impact-card { background:#171717; border:1px solid var(--line); border-radius:8px; }
+        .district-card { padding:22px; }
+        .card-label { font-family:'Space Mono',monospace; color:#777; font-size:.68rem; letter-spacing:.14em; text-transform:uppercase; margin-bottom:10px; }
+        .district-select { width:100%; background:transparent; color:#fff; border:0; border-bottom:1px solid rgba(255,122,24,.45); padding:8px 0 12px; font-family:'Bebas Neue',sans-serif; font-size:1.65rem; outline:none; appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23ff7a18' stroke-width='2' fill='none'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 18px; }
+        .district-select option { background:#171717; color:#fff; font-family:Inter,sans-serif; }
+        .custom-select { position:relative; width:100%; }
+        .custom-select-trigger { width:100%; background:transparent; color:#fff; border:0; border-bottom:1px solid rgba(255,122,24,.45); padding:8px 34px 14px 0; font-family:'Bebas Neue',sans-serif; font-size:1.65rem; line-height:1; text-align:left; outline:none; cursor:pointer; display:flex; align-items:center; justify-content:space-between; }
+        .custom-select-trigger .chev { color:var(--accent); font-size:1.2rem; transform:translateY(-2px); transition:.15s; }
+        .custom-select.open .chev { transform:rotate(180deg) translateY(2px); }
+        .custom-options { position:absolute; top:calc(100% + 8px); left:0; right:0; z-index:50; max-height:330px; overflow-y:auto; background:#f4f4f4; color:#151515; border-radius:8px; padding:8px; box-shadow:0 18px 45px rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.14); }
+        .custom-options::-webkit-scrollbar { width:8px; }
+        .custom-options::-webkit-scrollbar-track { background:#e7e7e7; border-radius:10px; }
+        .custom-options::-webkit-scrollbar-thumb { background:#9b9b9b; border-radius:10px; }
+        .custom-option { width:100%; border:0; background:transparent; color:#232323; display:flex; align-items:center; justify-content:space-between; padding:9px 10px; border-radius:7px; font-family:'Inter',sans-serif; font-size:.95rem; text-align:left; cursor:pointer; }
+        .custom-option:hover { background:#e8e8e8; }
+        .custom-option.active { background:#e8e8e8; }
+        .custom-check { color:#404040; font-size:1rem; font-weight:800; }
+        .status-row { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+        .tag { font-family:'Space Mono',monospace; font-size:.62rem; font-weight:700; padding:6px 9px; border-radius:2px; text-transform:uppercase; }
+        .tag.green { color:var(--green); border:1px solid rgba(0,240,160,.35); background:rgba(0,240,160,.08); }
+        .tag.yellow { color:var(--yellow); border:1px solid rgba(248,214,109,.35); background:rgba(248,214,109,.08); }
+        .tag.red { color:#ff8a2a; border:1px solid rgba(255,122,24,.35); background:rgba(255,122,24,.08); }
+        .dashboard { margin-top:42px; display:grid; grid-template-columns:1.3fr .9fr; gap:24px; }
+        .panel { padding:28px; position:relative; overflow:hidden; }
+        .panel.glow { background:linear-gradient(135deg, rgba(255,122,24,.12), rgba(23,23,23,1) 45%); }
+        .warning { color:#ff8a2a; font-family:'Space Mono',monospace; font-weight:700; letter-spacing:.14em; font-size:.78rem; text-transform:uppercase; display:flex; align-items:center; gap:10px; }
+        .metric-label { color:#bbb; font-family:'Space Mono',monospace; letter-spacing:.18em; text-transform:uppercase; margin-top:28px; }
+        .big-percent { font-family:'Bebas Neue',sans-serif; font-size:6.2rem; line-height:.95; letter-spacing:-.03em; margin-top:12px; }
+        .metric-caption { color:#ffb46b; font-family:'Bebas Neue',sans-serif; font-size:1.15rem; display:inline-flex; align-items:center; gap:10px; margin-left:10px; }
+        .mini-stats { border-top:1px solid var(--line); margin-top:28px; padding-top:22px; display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
+        .mini-title { color:#777; font-size:.62rem; text-transform:uppercase; }
+        .mini-val { font-weight:800; font-size:1.35rem; margin-top:6px; }
+        .mini-val.green { color:var(--green); }
+        .right-stack { display:flex; flex-direction:column; gap:20px; }
+        .map-box { height:180px; background:#030303; border-radius:8px 8px 0 0; border-bottom:1px solid var(--line); position:relative; overflow:hidden; }
+        .map-lines { position:absolute; inset:0; background:linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px); background-size:18px 18px; transform:perspective(250px) rotateX(54deg) translateY(-50px); opacity:.5; }
+        .critical-label { position:absolute; top:18px; left:18px; background:#161616; color:#aaa; border-radius:20px; padding:6px 12px; font-family:'Space Mono',monospace; font-size:.62rem; letter-spacing:.12em; }
+        .deploy { padding:24px; }
+        .deploy-title { font-family:'Bebas Neue',sans-serif; font-size:1.35rem; letter-spacing:.06em; margin-bottom:16px; }
+        .crime-selector { display:flex; gap:8px; flex-wrap:wrap; margin-top:20px; }
+        .crime-pill { background:#202020; border:1px solid var(--line); color:#aaa; padding:7px 10px; border-radius:3px; font-family:'Space Mono',monospace; font-size:.58rem; text-transform:uppercase; cursor:pointer; transition:.15s; }
+        .crime-pill.active { background:rgba(255,122,24,.16); color:#ffb46b; border-color:rgba(255,122,24,.45); }
+        .impact-grid { margin-top:24px; display:grid; grid-template-columns:repeat(4,1fr); gap:20px; }
+        .impact-card { padding:22px; min-height:190px; cursor:pointer; transition:.15s; }
+        .impact-card:hover { transform:translateY(-2px); border-color:rgba(255,122,24,.35); }
+        .impact-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:22px; }
+        .icon-box { width:36px; height:36px; background:#252525; display:grid; place-items:center; }
+        .impact-title { font-family:'Bebas Neue',sans-serif; font-size:1.35rem; }
+        .impact-desc { color:#8d8d8d; font-size:.78rem; line-height:1.45; min-height:46px; }
+        .impact-value { font-family:'Bebas Neue',sans-serif; font-size:2rem; margin-top:16px; }
+        .chart-panel { margin-top:24px; }
+        .bars { height:250px; display:flex; align-items:end; gap:4px; padding:20px 0 0; }
+        .bar-wrap { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:end; height:100%; }
+        .bar { width:100%; max-width:145px; background:rgba(255,122,24,.35); border-top:2px solid rgba(255,122,24,.7); min-height:8px; position:relative; }
+        .bar.forecast { background:rgba(255,122,24,.55); box-shadow:0 0 24px rgba(255,122,24,.12); }
+        .bar-label { color:#666; font-size:.68rem; margin-top:10px; }
+        .bar-label.forecast { color:#ffb46b; font-weight:700; }
+        .insights { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:24px; }
+        .insight { background:#262626; border-left:4px solid var(--accent); padding:14px 16px; font-size:.82rem; line-height:1.45; }
+        .insight.green { border-left-color:var(--green); }
+        .waiting { min-height:500px; display:grid; place-items:center; text-align:center; }
+        .waiting-ring { width:86px; height:86px; border:1px solid rgba(255,122,24,.25); display:grid; place-items:center; margin:0 auto 22px; position:relative; }
+        .waiting-ring:before { content:''; position:absolute; inset:-8px; border:1px solid rgba(255,122,24,.08); }
+        @media (max-width:1100px){ .content{padding:34px 22px}.hero-grid,.dashboard,.impact-grid,.insights{grid-template-columns:1fr}.mini-stats{grid-template-columns:1fr 1fr}.big-percent{font-size:4.8rem} }
       `}</style>
 
-      <div style={{ maxWidth: "1360px", margin: "0 auto" }}>
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "1.75rem" }}>
-          <div>
-            <div className="mono-label" style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
-              <div style={{ width: 20, height: 1, background: "#ff6b4a" }} />
-              Predictive Analytics Engine — Hybrid RF+XGBoost
+      <main className="main">
+        <section className="content">
+          <div className="hero-grid">
+            <div>
+              <div className="eyebrow">— PREDICTIVE ANALYTICS ENGINE — HYBRID RF+XGBOOST</div>
+              <h1 className="title">CRIME CLASSIFICATION &<br/><span>PREDICTION 2026</span></h1>
+              <div className="subtitle">Strategic Forecasting • Sri Lanka District Model</div>
             </div>
-            <h1 className="bebas" style={{ fontSize: "clamp(2.2rem,4vw,3.6rem)", color: "#fff", letterSpacing: "0.03em", lineHeight: 0.92, margin: 0 }}>
-              Crime Predictions <span style={{ color: "#ff6b4a" }}>2026</span>
-            </h1>
-            <p style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.52rem", color: "#455060", letterSpacing: "0.12em", textTransform: "uppercase", marginTop: "0.35rem" }}>
-              Sri Lanka District-Level Forecast · All 25 Districts · 13 Crime Categories
-            </p>
-          </div>
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-            <div style={{
-              padding: "0.18rem 0.5rem", background: "rgba(34,197,94,0.08)",
-              border: "1px solid rgba(34,197,94,0.25)", fontFamily: "'Space Mono',monospace",
-              fontSize: "0.48rem", letterSpacing: "0.1em", color: "#22c55e",
-              display: "flex", alignItems: "center", gap: "0.3rem",
-            }}>
-              <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", animation: "pulse-slow 1s infinite" }} />
-              SYSTEM ONLINE
-            </div>
-          </div>
-        </div>
+            <div className="district-card">
+              <div className="card-label">District Selection</div>
+              <div className={`custom-select ${isDistrictOpen ? "open" : ""}`}>
+                <button
+                  type="button"
+                  className="custom-select-trigger"
+                  onClick={() => setDistrictOpen((open) => !open)}
+                >
+                  <span>{distName ? distName.toUpperCase() : "SELECT DISTRICT"}</span>
+                  <span className="chev">⌄</span>
+                </button>
 
-        {/* Main grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: "1rem", marginBottom: "1rem" }}>
-
-          {/* Left panel */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            <div className="pc" style={{ padding: "1.25rem" }}>
-              <div className="pc-corner" />
-              <div className="pc-corner-bl" />
-              <div className="mono-label" style={{ marginBottom: "0.6rem" }}>01 — District</div>
-              <select
-                className="pred-select"
-                value={selectedDistrict}
-                onChange={(e) => { setDistrict(e.target.value); setAnalyzed(false); }}
-              >
-                <option value="">Select District...</option>
-                {districts.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-              {selectedDistrict && (
-                <div style={{ marginTop: "0.75rem", display: "flex", alignItems: "center", gap: "0.4rem", fontFamily: "'Space Mono',monospace", fontSize: "0.5rem", color: "#22c55e", letterSpacing: "0.1em" }}>
-                  <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", animation: "pulse-slow 2s infinite" }} />
-                  DISTRICT LOCKED — ID {selectedDistrict}
-                </div>
-              )}
-            </div>
-
-            <div className="pc" style={{ padding: "1.25rem" }}>
-              <div className="pc-corner" />
-              <div className="mono-label" style={{ marginBottom: "0.75rem" }}>02 — Crime Category</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
-                {CRIME_KEYS.map((key) => (
-                  <button
-                    key={key}
-                    className={`crime-pill${selectedCrime === key ? " active" : ""}`}
-                    onClick={() => setCrime(key)}
-                  >
-                    {CRIME_LABELS[key].replace("over Rs. 50,000", "50k+").replace("by Knife", "(Knife)")}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Right panel */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            {selectedDistrict ? (
-              <>
-                {/* Risk strip */}
-                <div className="pc fade-in" style={{ padding: "1rem 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
-                  <div className="pc-corner" />
-                  <div>
-                    <div className="mono-label" style={{ marginBottom: "0.3rem" }}>Active Forecast Target</div>
-                    <div className="bebas" style={{ fontSize: "1.8rem", color: "#fff", letterSpacing: "0.03em", lineHeight: 1 }}>
-                      {distName} — {CRIME_LABELS[selectedCrime]}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
-                    <div>
-                      <div className="mono-label" style={{ marginBottom: "0.3rem" }}>2026 Forecast</div>
-                      <div className="bebas" style={{ fontSize: "2rem", color: "#ff6b4a", letterSpacing: "0.02em" }}>
-                        {predValue > 0 ? <AnimatedNumber target={predValue} /> : "—"}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="mono-label" style={{ marginBottom: "0.3rem" }}>Risk Level</div>
-                      <div className="risk-badge" style={{ color: riskMeta.color, background: riskMeta.bg, borderColor: riskMeta.border }}>
-                        {riskMeta.icon} {riskLevel}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="mono-label" style={{ marginBottom: "0.3rem" }}></div>
-                      <div style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.55rem", color: "#38bdf8", letterSpacing: "0.06em" }}>
-                        
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Line chart */}
-                <div className="pc fade-in" style={{ padding: "1.25rem" }}>
-                  <div className="pc-corner" />
-                  <div className="mono-label" style={{ marginBottom: "0.25rem" }}>Historical vs Predicted Trend</div>
-                  <div className="bebas" style={{ fontSize: "1rem", color: "#e2e8f0", letterSpacing: "0.04em", marginBottom: "1rem" }}>
-                    {distName} — {CRIME_LABELS[selectedCrime]}
-                  </div>
-                  <ResponsiveContainer width="100%" height={320}>
-                    <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                      <CartesianGrid {...gridStyle} />
-                      <XAxis dataKey="year" type="category" tick={axisStyle} axisLine={false} tickLine={false} interval={0} />
-                      <YAxis
-                        tick={axisStyle} axisLine={false} tickLine={false}
-                        tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)}
-                      />
-                      <Tooltip content={<SentinelTooltip />} />
-                      <Legend wrapperStyle={{ fontFamily: "'Space Mono',monospace", fontSize: "0.5rem", color: "#455060" }} />
-                      <Line
-                        type="monotone"
-                        dataKey="actual"
-                        stroke="#ff6b4a"
-                        strokeWidth={2}
-                        name="Historical"
-                        dot={{ fill: "#ff6b4a", r: 4 }}
-                        activeDot={{ r: 6 }}
-                        connectNulls={false}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="predicted"
-                        stroke="#38bdf8"
-                        strokeWidth={2.5}
-                        strokeDasharray="6 4"
-                        name="Predicted 2026"
-                        dot={<PredictedDot />}
-                        activeDot={{ r: 9, fill: "#38bdf8", stroke: "#060810", strokeWidth: 2 }}
-                        connectNulls={true}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Predictions table — Model & Confidence columns REMOVED */}
-                {predictions.length > 0 && (
-                  <div className="pc fade-in">
-                    <div className="pc-corner" />
-                    <div style={{ padding: "1rem 1.5rem", borderBottom: "1px solid rgba(255,107,74,0.08)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <div>
-                        <div className="mono-label" style={{ marginBottom: "0.2rem" }}>Prediction Data Table</div>
-                        <div className="bebas" style={{ fontSize: "1.1rem", color: "#e2e8f0", letterSpacing: "0.04em" }}>
-                          {distName} — All Categories · 2026
-                        </div>
-                      </div>
-                      <div style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.5rem", color: "#455060" }}>
-                        {predictions.length} predictions · Hybrid RF+XGBoost
-                      </div>
-                    </div>
-                    <table className="pred-table">
-                      <thead>
-                        <tr>
-                          <th className="pred-th">#</th>
-                          <th className="pred-th">Crime Category</th>
-                          <th className="pred-th">DB Key</th>
-                          <th className="pred-th">Year</th>
-                          <th className="pred-th">Predicted Cases</th>
-                          <th className="pred-th">Risk Level</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {CRIME_KEYS.map((key, i) => {
-                          const pred = predictions.find(
-                            (p) => p.crimeType?.toLowerCase().replace(/\s/g, "") === key.toLowerCase()
-                          );
-                          const val  = pred?.predictedValue ?? 0;
-                          const risk = getRiskLevel(key, val);
-                          const rm   = RISK_META[risk];
-                          return (
-                            <tr
-                              key={key}
-                              className="pred-tr"
-                              style={{ background: key === selectedCrime ? "rgba(255,107,74,0.04)" : undefined }}
-                              onClick={() => setCrime(key)}
-                            >
-                              <td className="pred-td" style={{ color: "#2d3a4a" }}>{String(i + 1).padStart(2, "0")}</td>
-                              <td className="pred-td big">{CRIME_LABELS[key]}</td>
-                              <td className="pred-td" style={{ color: "#38bdf8", fontSize: "0.5rem" }}>{key}</td>
-                              <td className="pred-td big">{pred?.predictedYear ?? 2026}</td>
-                              <td className="pred-td big" style={{ color: key === selectedCrime ? "#ff6b4a" : "#e2e8f0" }}>
-                                {val.toLocaleString()}
-                              </td>
-                              <td className="pred-td">
-                                <span className="risk-badge" style={{ color: rm.color, background: rm.bg, borderColor: rm.border, padding: "0.18rem 0.5rem" }}>
-                                  {risk}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                {isDistrictOpen && (
+                  <div className="custom-options">
+                    <button
+                      type="button"
+                      className={`custom-option ${!selectedDistrict ? "active" : ""}`}
+                      onClick={() => {
+                        setDistrict("");
+                        setAnalyzed(false);
+                        setDistrictOpen(false);
+                      }}
+                    >
+                      <span>SELECT DISTRICT</span>
+                      {!selectedDistrict && <span className="custom-check">✓</span>}
+                    </button>
+                    {districts.map((d) => {
+                      const value = String(d.id);
+                      const active = selectedDistrict === value;
+                      return (
+                        <button
+                          key={d.id}
+                          type="button"
+                          className={`custom-option ${active ? "active" : ""}`}
+                          onClick={() => {
+                            setDistrict(value);
+                            setAnalyzed(false);
+                            setDistrictOpen(false);
+                          }}
+                        >
+                          <span>{d.name}</span>
+                          {active && <span className="custom-check">✓</span>}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
-              </>
-            ) : (
-              <div className="pc" style={{ minHeight: 500 }}>
-                <div className="waiting">
-                  <div className="waiting-ring">
-                    <Target size={28} style={{ color: "#ff6b4a", opacity: 0.4 }} />
-                  </div>
-                  <div className="bebas" style={{ fontSize: "1.6rem", color: "#cdd9e5", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>
-                    Awaiting District Selection
-                  </div>
-                  <p style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.55rem", color: "#2d3a4a", letterSpacing: "0.06em", lineHeight: 1.8, maxWidth: 320, textAlign: "center" }}>
-                    Select a district to activate predictive analytics. Choose a crime category and run the hybrid RF+XGBoost model to view 2026 forecasts.
-                  </p>
-                </div>
               </div>
-            )}
+              <div className="status-row"><span className="tag green">Operational</span><span className="tag yellow">Hybrid RF+XGBoost</span></div>
+            </div>
           </div>
 
-        </div>
-      </div>
+          {selectedDistrict ? (
+            <>
+              <div className="dashboard">
+                <div className="panel glow">
+                  <div className="warning"><span style={{ width:8, height:8, borderRadius:"50%", background:"var(--accent)" }} /> Forecast Variance Detected</div>
+                  <div className="metric-label">Predicted Crime Contribution</div>
+                  <div><span className="big-percent">+{selectedContribution}%</span><span className="metric-caption"><TrendingUp size={34}/> FORECAST SHARE</span></div>
+                  <div className="mini-stats">
+                    <div><div className="mini-title">Predicted Cases</div><div className="mini-val"><AnimatedNumber target={predValue}/></div></div>
+                    <div><div className="mini-title">Total District Forecast</div><div className="mini-val">{totalPred.toLocaleString()}</div></div>
+                    <div><div className="mini-title">Classification Rank</div><div className="mini-val green">#{selectedRank}</div></div>
+                  </div>
+                </div>
+
+                <div className="right-stack">
+                  <div className="panel" style={{ padding:0 }}>
+                    <div className="map-box"><div className="map-lines"/><div className="critical-label">● CRITICAL CRIME ZONES</div></div>
+                    <div className="deploy">
+                      <div className="deploy-title">ACTIVE CLASSIFICATION</div>
+                      <div className="card-label" style={{ marginBottom:8 }}>{distName} • {CRIME_LABELS[selectedCrime]}</div>
+                      <div className="risk-badge" style={{ color:riskMeta.color, background:riskMeta.bg, borderColor:riskMeta.border }}>{riskLevel}</div>
+                      <div className="crime-selector">
+                        {CRIME_KEYS.map((key) => <button key={key} className={`crime-pill${selectedCrime === key ? " active" : ""}`} onClick={() => setCrime(key)}>{CRIME_LABELS[key].replace("over Rs. 50,000", "50k+").replace("by Knife", "Knife")}</button>)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="impact-grid">
+                {topThree.map((p, i) => {
+                  const key = p.crimeType as CrimeKey;
+                  const val = p.predictedValue ?? 0;
+                  const pct = totalPred > 0 ? Math.round((val / totalPred) * 100) : 0;
+                  const risk = getRiskLevel(key, val);
+                  return (
+                    <div key={key} className="impact-card" onClick={() => setCrime(key)}>
+                      <div className="impact-top"><div className="icon-box">{i === 0 ? <Database size={18}/> : i === 1 ? <AlertTriangle size={18}/> : <Crosshair size={18}/>}</div><span className={risk === "LOW" ? "tag green" : risk === "MEDIUM" ? "tag yellow" : "tag red"}>{risk} Impact</span></div>
+                      <div className="impact-title">{CRIME_LABELS[key]}</div>
+                      <div className="impact-desc">Highest model output cluster for {distName}. Click to inspect this crime category.</div>
+                      <div className="impact-value">+{pct}% <span style={{ color:"#ffb46b", fontFamily:"Space Mono", fontSize:".6rem" }}>FORECAST CONTRIB.</span></div>
+                    </div>
+                  );
+                })}
+                <div className="impact-card" onClick={() => setCrime(selectedCrime)}>
+                  <div className="impact-top"><div className="icon-box"><BarChart3 size={18}/></div><span className="tag red">Selected</span></div>
+                  <div className="impact-title">{CRIME_LABELS[selectedCrime]}</div>
+                  <div className="impact-desc">Current selected category for detailed prediction and trend comparison.</div>
+                  <div className="impact-value">{predValue.toLocaleString()} <span style={{ color:"#ffb46b", fontFamily:"Space Mono", fontSize:".6rem" }}>CASES</span></div>
+                </div>
+              </div>
+
+              <div className="panel chart-panel">
+                <div style={{ display:"flex", justifyContent:"space-between", gap:16, flexWrap:"wrap" }}>
+                  <div><div className="impact-title">CRIME TREND PROJECTION 2021–2026</div><div className="card-label">Historical observations vs hybrid model forecast</div></div>
+                  <div className="status-row"><span className="tag red">Forecast</span><span className="tag yellow">Incident Vol.</span></div>
+                </div>
+                <div className="bars">
+                  {chartBars.map((p) => (
+                    <div key={p.year} className="bar-wrap">
+                      <div className={`bar ${p.type === "Forecast" ? "forecast" : ""}`} style={{ height:`${Math.max(12, (p.bar / maxBar) * 210)}px` }} title={`${p.year}: ${p.bar.toLocaleString()}`} />
+                      <div className={`bar-label ${p.type === "Forecast" ? "forecast" : ""}`}>{p.year}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="insights">
+                  <div className="insight"><strong style={{ color:"#ffb46b" }}>CRITICAL INSIGHT</strong><br/>The 2026 forecast for <b>{CRIME_LABELS[selectedCrime]}</b> in {distName} is {predValue.toLocaleString()} cases with {riskLevel.toLowerCase()} classification.</div>
+                  <div className="insight green"><strong style={{ color:"var(--green)" }}>MODEL STATUS</strong><br/>Hybrid RF+XGBoost prediction is active. Change from latest historical value: <b>{changePercent >= 0 ? "+" : ""}{changePercent}%</b>.</div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="panel waiting" style={{ marginTop:42 }}>
+              <div>
+                <div className="waiting-ring"><Target size={34} color="#ff7a18" /></div>
+                <div className="impact-title">AWAITING DISTRICT SELECTION</div>
+                <p style={{ color:"#777", maxWidth:420, lineHeight:1.7, fontFamily:"Space Mono", fontSize:".72rem" }}>Select a district to activate classification forecasting and view the 2026 prediction dashboard.</p>
+              </div>
+            </div>
+          )}
+        </section>
+      </main>
     </div>
   );
 }
