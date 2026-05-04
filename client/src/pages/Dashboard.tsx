@@ -1,19 +1,22 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Sector,
 } from "recharts";
-import { TrendingUp, TrendingDown, Printer, Download } from "lucide-react";
+import { TrendingUp, TrendingDown, Download } from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const COLORS = [
-  "#ef4444","#f97316","#eab308","#84cc16","#22c55e",
-  "#3b82f6","#8b5cf6","#ec4899","#14b8a6","#f43f5e",
-  "#a855f7","#06b6d4","#facc15",
+// All slices start monochromatic dark — only the clicked one lights up orange
+const MONO_COLORS = [
+  "#2a1a15","#321e18","#3a231c","#422720","#4a2b24",
+  "#522f28","#5a332c","#623730","#6a3b34","#723f38",
+  "#7a433c","#824740","#8a4b44",
 ];
+const ACTIVE_COLOR = "#ff6b4a";
+const HOVER_COLOR  = "#cc5239";
 
 const RISK_COLORS: Record<string, string> = {
   critical: "#dc2626",
@@ -24,7 +27,6 @@ const RISK_COLORS: Record<string, string> = {
 
 const YEARS = ["2021", "2022", "2023"];
 
-// ALL 13 columns confirmed from CSV export
 const CRIME_TYPE_MAP: Record<string, string> = {
   "Rape Cases":           "rapeCases",
   "Homicide":             "homicide",
@@ -67,7 +69,6 @@ interface RawStat {
   extortion: number;
   unnaturalOffense: number;
   sexualAbuse: number;
-  // Supabase returns joined tables as arrays
   districts: { id: number; name: string }[] | null;
 }
 
@@ -129,7 +130,38 @@ function getCrimeCount(stat: CrimeStat, type: string): number {
   return col ? (stat as any)[col] ?? 0 : 0;
 }
 
-// ─── Custom Tooltip ───────────────────────────────────────────────────────────
+// ─── Active slice shape — expands + glows ─────────────────────────────────────
+
+const ActiveSlice = (props: any) => {
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle } = props;
+  return (
+    <g>
+      <Sector
+        cx={cx} cy={cy}
+        innerRadius={innerRadius}
+        outerRadius={outerRadius + 10}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        fill={ACTIVE_COLOR}
+        stroke={ACTIVE_COLOR}
+        strokeWidth={1}
+        style={{ filter: "drop-shadow(0 0 10px rgba(255,107,74,0.7))" }}
+      />
+      {/* Outer ring arc */}
+      <Sector
+        cx={cx} cy={cy}
+        innerRadius={outerRadius + 14}
+        outerRadius={outerRadius + 16}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        fill={ACTIVE_COLOR}
+        opacity={0.4}
+      />
+    </g>
+  );
+};
+
+// ─── Custom bar tooltip ───────────────────────────────────────────────────────
 
 const SentinelTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -154,12 +186,13 @@ export default function Dashboard() {
   const [error, setError]     = useState<string | null>(null);
   const [selectedYear, setSelectedYear]           = useState("2023");
   const [selectedCrimeType, setSelectedCrimeType] = useState("Robbery");
+  const [activeSlice, setActiveSlice]             = useState<number | null>(null);
+  const [hoveredSlice, setHoveredSlice]           = useState<number | null>(null);
 
-  // ── Fetch from Supabase ──────────────────────────────────────────────────
+  // ── Fetch ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const loadData = async () => {
-      setLoading(true);
-      setError(null);
+      setLoading(true); setError(null);
       try {
         const { data, error: err } = await supabase
           .from("crimeStatistics")
@@ -172,9 +205,7 @@ export default function Dashboard() {
             districts ( id, name )
           `)
           .order("year", { ascending: true });
-
         if (err) throw new Error(err.message);
-
         const mapped: CrimeStat[] = (data as unknown as RawStat[]).map((row) => ({
           year:              row.year,
           districtId:        row.districtId,
@@ -199,7 +230,6 @@ export default function Dashboard() {
           unnaturalOffense:  row.unnaturalOffense  ?? 0,
           sexualAbuse:       row.sexualAbuse       ?? 0,
         }));
-
         setStats(mapped);
       } catch (e: any) {
         setError(e.message ?? "Failed to load data");
@@ -210,65 +240,38 @@ export default function Dashboard() {
     loadData();
   }, []);
 
-  // ── Derived summary ──────────────────────────────────────────────────────
+  // ── Summary ──────────────────────────────────────────────────────────────
   const summary = useMemo((): DashboardSummary | null => {
     if (!stats.length) return null;
-
     const districtNames  = Array.from(new Set(stats.map((s) => s.districtName)));
     const totalDistricts = districtNames.length;
     const totalCrimes    = stats.reduce((s, r) => s + r.total, 0);
     const avgPerDistrict = totalDistricts > 0 ? Math.round(totalCrimes / totalDistricts) : 0;
-
     const districtTotals = districtNames.map((name) => {
-      const rows  = stats.filter((r) => r.districtName === name);
-      const total = rows.reduce((s, r) => s + r.total, 0);
-      const byYear = YEARS.map((y) =>
-        rows.filter((r) => String(r.year) === y).reduce((s, r) => s + r.total, 0)
-      );
-      const prev = byYear[byYear.length - 2] ?? 0;
-      const last = byYear[byYear.length - 1] ?? 0;
-      const yoy  = prev > 0 ? Math.round(((last - prev) / prev) * 1000) / 10 : 0;
-      return {
-        name,
-        total,
-        yoy,
-        trend:      yoy > 2 ? "increasing" : yoy < -2 ? "decreasing" : "stable",
-        risk:       getRiskLevel(total, avgPerDistrict),
-        avgPerYear: Math.round(total / YEARS.length),
-      };
+      const rows   = stats.filter((r) => r.districtName === name);
+      const total  = rows.reduce((s, r) => s + r.total, 0);
+      const byYear = YEARS.map((y) => rows.filter((r) => String(r.year) === y).reduce((s, r) => s + r.total, 0));
+      const prev   = byYear[byYear.length - 2] ?? 0;
+      const last   = byYear[byYear.length - 1] ?? 0;
+      const yoy    = prev > 0 ? Math.round(((last - prev) / prev) * 1000) / 10 : 0;
+      return { name, total, yoy, trend: yoy > 2 ? "increasing" : yoy < -2 ? "decreasing" : "stable", risk: getRiskLevel(total, avgPerDistrict), avgPerYear: Math.round(total / YEARS.length) };
     });
-
     const highRiskDistricts: HighRiskDistrict[] = districtTotals
       .filter((d) => d.risk === "high" || d.risk === "critical")
       .sort((a, b) => b.total - a.total)
-      .map((d, idx) => ({
-        district: { id: idx, name: d.name },
-        summary:  {
-          totalCrimes:        d.total,
-          averagePerYear:     d.avgPerYear,
-          trend:              d.trend,
-          riskLevel:          d.risk,
-          yearOverYearChange: d.yoy,
-        },
-      }));
-
+      .map((d, idx) => ({ district: { id: idx, name: d.name }, summary: { totalCrimes: d.total, averagePerYear: d.avgPerYear, trend: d.trend, riskLevel: d.risk, yearOverYearChange: d.yoy } }));
     return { totalDistricts, totalCrimes, averageCrimesPerDistrict: avgPerDistrict, highRiskCount: highRiskDistricts.length, highRiskDistricts };
   }, [stats]);
 
   // ── Chart data ───────────────────────────────────────────────────────────
-  const yearData = useMemo(() =>
-    YEARS.map((year) => {
-      const rows  = stats.filter((r) => String(r.year) === year);
-      const total = rows.reduce((s, r) => s + r.total, 0);
-      return { year, total, average: rows.length > 0 ? Math.round(total / rows.length) : 0 };
-    }), [stats]);
-
   const crimeTypeData = useMemo(() => {
     const rows = stats.filter((r) => String(r.year) === selectedYear);
     return CRIME_TYPES
       .map((type) => ({ name: type, value: rows.reduce((s, r) => s + getCrimeCount(r, type), 0) }))
       .filter((d) => d.value > 0);
   }, [stats, selectedYear]);
+
+  const totalForYear = useMemo(() => crimeTypeData.reduce((s, d) => s + d.value, 0), [crimeTypeData]);
 
   const trendData = useMemo(() =>
     YEARS.map((year) => {
@@ -277,7 +280,6 @@ export default function Dashboard() {
     }), [stats, selectedCrimeType]);
 
   // ── Export ───────────────────────────────────────────────────────────────
-  const handlePrint = () => window.print();
   const handleExportCSV = () => {
     if (!summary?.highRiskDistricts?.length) return;
     let csv = "District,Total Crimes,Average per Year,Trend,Risk Level,YoY Change\n";
@@ -293,56 +295,49 @@ export default function Dashboard() {
     document.body.removeChild(el);
   };
 
-  // ── Loading ──────────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div style={{ minHeight: "100vh", background: "#0a0c0f", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "1rem" }}>
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ff6b4a" strokeWidth="1.5" style={{ animation: "spin 1s linear infinite" }}>
-          <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-        </svg>
-        <p style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.65rem", letterSpacing: "0.16em", color: "#555e6a", textTransform: "uppercase" }}>
-          Loading intelligence data...
-        </p>
-      </div>
-    );
-  }
+  const activeData    = activeSlice !== null ? crimeTypeData[activeSlice] : null;
+  const activePercent = activeData ? ((activeData.value / totalForYear) * 100).toFixed(1) : null;
 
-  // ── Error ────────────────────────────────────────────────────────────────
-  if (error) {
-    return (
-      <div style={{ minHeight: "100vh", background: "#0a0c0f", display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
-        <div style={{ background: "#0d1117", border: "1px solid rgba(220,38,38,0.3)", padding: "2rem", maxWidth: 480, width: "100%", position: "relative" }}>
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "#dc2626" }} />
-          <p style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.62rem", color: "#f87171", letterSpacing: "0.08em", marginBottom: "1rem" }}>
-            DATA LOAD FAILURE: {error}
-          </p>
-          <button onClick={() => window.location.reload()} style={{ background: "#ff6b4a", color: "#0a0c0f", border: "none", fontFamily: "'Space Mono',monospace", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase", padding: "0.65rem 1.25rem", cursor: "pointer" }}>
-            Retry Connection
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // ── Loading / Error ──────────────────────────────────────────────────────
+  if (loading) return (
+    <div style={{ minHeight: "100vh", background: "#0a0c0f", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "1rem" }}>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ff6b4a" strokeWidth="1.5" style={{ animation: "spin 1s linear infinite" }}>
+        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+      </svg>
+      <p style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.65rem", letterSpacing: "0.16em", color: "#555e6a", textTransform: "uppercase" }}>Loading intelligence data...</p>
+    </div>
+  );
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  if (error) return (
+    <div style={{ minHeight: "100vh", background: "#0a0c0f", display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
+      <div style={{ background: "#0d1117", border: "1px solid rgba(220,38,38,0.3)", padding: "2rem", maxWidth: 480, width: "100%", position: "relative" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "#dc2626" }} />
+        <p style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.62rem", color: "#f87171", letterSpacing: "0.08em", marginBottom: "1rem" }}>DATA LOAD FAILURE: {error}</p>
+        <button onClick={() => window.location.reload()} style={{ background: "#ff6b4a", color: "#0a0c0f", border: "none", fontFamily: "'Space Mono',monospace", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase", padding: "0.65rem 1.25rem", cursor: "pointer" }}>
+          Retry Connection
+        </button>
+      </div>
+    </div>
+  );
+
   const axisStyle = { fontFamily: "'Space Mono',monospace", fontSize: "0.55rem", fill: "#555e6a" };
   const gridStyle = { stroke: "rgba(255,107,74,0.06)", strokeDasharray: "4 4" };
+  const halfIdx   = Math.ceil(crimeTypeData.length / 2);
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0c0f", padding: "2rem", fontFamily: "'Inter',sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&family=Inter:wght@300;400;500;600&display=swap');
         @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
         @media print{body{background:white;}.no-print{display:none!important;}}
 
         .db-card{background:#0d1117;border:1px solid rgba(255,107,74,0.12);position:relative;overflow:hidden;border-radius:0;}
         .db-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#ff6b4a,rgba(255,107,74,0.15),transparent);}
         .db-card-corner{position:absolute;top:0;right:0;width:16px;height:16px;border-top:1.5px solid #ff6b4a;border-right:1.5px solid #ff6b4a;}
-
         .db-section-label{font-family:'Space Mono',monospace;font-size:0.52rem;letter-spacing:0.18em;color:#ff6b4a;text-transform:uppercase;margin-bottom:0.5rem;}
         .db-section-title{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;color:#fff;letter-spacing:0.04em;line-height:1;}
-        .db-section-sub{font-family:'Space Mono',monospace;font-size:0.55rem;color:#555e6a;letter-spacing:0.08em;margin-top:0.25rem;}
 
         .stat-card{background:#0d1117;border:1px solid rgba(255,107,74,0.12);padding:1.25rem 1.5rem;position:relative;overflow:hidden;}
         .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#ff6b4a,transparent);}
@@ -357,8 +352,6 @@ export default function Dashboard() {
         .db-btn{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.6rem 1.1rem;cursor:pointer;border:none;display:flex;align-items:center;gap:0.4rem;transition:all 0.15s;}
         .db-btn-outline{background:transparent;border:1px solid rgba(255,107,74,0.25)!important;color:#ff6b4a;}
         .db-btn-outline:hover{background:rgba(255,107,74,0.08);border-color:rgba(255,107,74,0.5)!important;}
-        .db-btn-solid{background:#ff6b4a;color:#0a0c0f;}
-        .db-btn-solid:hover{background:#ff8c74;}
 
         .table-wrap{background:#0d1117;border:1px solid rgba(255,107,74,0.12);}
         .db-table{width:100%;border-collapse:collapse;}
@@ -374,6 +367,18 @@ export default function Dashboard() {
         .trend-cell{display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;}
         .yoy-pos{font-family:'Space Mono',monospace;font-size:0.65rem;color:#dc2626;font-weight:700;}
         .yoy-neg{font-family:'Space Mono',monospace;font-size:0.65rem;color:#10b981;font-weight:700;}
+
+        /* Legend rows */
+        .leg-row{display:flex;align-items:center;gap:0.45rem;padding:0.28rem 0.5rem;cursor:pointer;border:1px solid transparent;transition:all 0.15s;border-radius:1px;}
+        .leg-row:hover{background:rgba(255,107,74,0.04);border-color:rgba(255,107,74,0.12);}
+        .leg-row.active-leg{background:rgba(255,107,74,0.07);border-color:rgba(255,107,74,0.28);}
+        .leg-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;transition:all 0.2s;}
+        .leg-name{font-family:'Space Mono',monospace;font-size:0.62rem;color:#3d444d;letter-spacing:0.04em;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color 0.2s;}
+        .leg-row.active-leg .leg-name{color:#c8d0da;}
+        .leg-pct{font-family:'Bebas Neue',sans-serif;font-size:1rem;color:#2a3040;transition:color 0.2s;flex-shrink:0;}
+        .leg-row.active-leg .leg-pct{color:#ff6b4a;}
+
+        .detail-fade{animation:fadeIn 0.18s ease;}
       `}</style>
 
       <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
@@ -389,9 +394,8 @@ export default function Dashboard() {
               Sri Lanka District-Level Crime Statistics · 2021–2023
             </p>
           </div>
-          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "0.75rem" }}>
             <button className="db-btn db-btn-outline" onClick={handleExportCSV}><Download size={12} /> Export CSV</button>
-            <button className="db-btn db-btn-solid"  onClick={handlePrint}><Printer size={12} /> Print Report</button>
           </div>
         </div>
 
@@ -425,20 +429,21 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Charts row */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
-
-         
-
-          {/* Pie chart */}
+        {/* ── PIE CHART ──────────────────────────────────────────────────────── */}
+        <div style={{ marginBottom: "1.5rem" }}>
           <div className="db-card" style={{ padding: "1.5rem" }}>
             <div className="db-card-corner" />
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "1rem" }}>
+
+            {/* Header row */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "1.25rem" }}>
               <div>
                 <div className="db-section-label">Distribution</div>
                 <div className="db-section-title">Crime Type Breakdown</div>
+                <p style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.46rem", color: "#2a3040", letterSpacing: "0.1em", marginTop: "0.3rem" }}>
+                  CLICK ANY SLICE OR ROW TO INSPECT
+                </p>
               </div>
-              <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <Select value={selectedYear} onValueChange={(y) => { setSelectedYear(y); setActiveSlice(null); }}>
                 <SelectTrigger style={{ width: 90, background: "#0a0c0f", border: "1px solid rgba(255,107,74,0.2)", borderRadius: 0, color: "#e2e8f0", fontFamily: "'Space Mono',monospace", fontSize: "0.65rem" }}>
                   <SelectValue />
                 </SelectTrigger>
@@ -447,33 +452,123 @@ export default function Dashboard() {
                 </SelectContent>
               </Select>
             </div>
+
             {crimeTypeData.length === 0 ? (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 280, fontFamily: "'Space Mono',monospace", fontSize: "0.62rem", color: "#3d444d", letterSpacing: "0.1em", textTransform: "uppercase" }}>
                 No data for {selectedYear}
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={380}>
-                <PieChart>
-                  <Pie
-                    data={crimeTypeData}
-                    cx="38%" cy="50%"
-                    outerRadius={110}
-                    dataKey="value"
-                    label={({ percent }: { percent: number }) => `${(percent * 100).toFixed(0)}%`}
-                    labelLine={{ stroke: "rgba(255,107,74,0.3)" }}
-                  >
-                    {crimeTypeData.map((_e, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip content={<SentinelTooltip />} />
-                  <Legend
-                    layout="vertical" align="right" verticalAlign="middle"
-                    formatter={(value) => (
-                      <span style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.52rem", color: "#8b949e", letterSpacing: "0.04em" }}>{value}</span>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 260px 1fr", gap: "1.25rem", alignItems: "center" }}>
+
+                {/* LEFT legend */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+                  {crimeTypeData.slice(0, halfIdx).map((entry, i) => {
+                    const pct      = ((entry.value / totalForYear) * 100).toFixed(1);
+                    const isActive = activeSlice === i;
+                    return (
+                      <div key={entry.name} className={`leg-row ${isActive ? "active-leg" : ""}`} onClick={() => setActiveSlice(isActive ? null : i)}>
+                        <div className="leg-dot" style={{ background: isActive ? ACTIVE_COLOR : "#3a231c", border: `1px solid ${isActive ? ACTIVE_COLOR : "#5a332c"}` }} />
+                        <span className="leg-name">{entry.name}</span>
+                        <span className="leg-pct">{pct}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* CENTER — donut pie */}
+                <div style={{ position: "relative" }}>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <PieChart>
+                      <Pie
+                        data={crimeTypeData}
+                        cx="50%" cy="50%"
+                        outerRadius={108}
+                        innerRadius={42}
+                        dataKey="value"
+                        activeIndex={activeSlice ?? undefined}
+                        activeShape={<ActiveSlice />}
+                        onClick={(_, index) => setActiveSlice(activeSlice === index ? null : index)}
+                        onMouseEnter={(_, index) => setHoveredSlice(index)}
+                        onMouseLeave={() => setHoveredSlice(null)}
+                        stroke="#0a0c0f"
+                        strokeWidth={1.5}
+                        style={{ cursor: "pointer" }}
+                      >
+                        {crimeTypeData.map((_e, i) => (
+                          <Cell
+                            key={i}
+                            fill={
+                              activeSlice === i
+                                ? ACTIVE_COLOR
+                                : hoveredSlice === i && activeSlice === null
+                                ? HOVER_COLOR
+                                : MONO_COLORS[i % MONO_COLORS.length]
+                            }
+                          />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+
+                  {/* Donut center label */}
+                  <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", textAlign: "center", pointerEvents: "none" }}>
+                    {activeSlice !== null ? (
+                      <div className="detail-fade">
+                        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "1.7rem", color: ACTIVE_COLOR, lineHeight: 1 }}>{activePercent}%</div>
+                        <div style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.36rem", color: "#555e6a", letterSpacing: "0.12em", textTransform: "uppercase", marginTop: "2px" }}>selected</div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "1rem", color: "#2a3040", lineHeight: 1 }}>{selectedYear}</div>
+                        <div style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.34rem", color: "#1e252e", letterSpacing: "0.1em", textTransform: "uppercase", marginTop: "2px" }}>tap slice</div>
+                      </div>
                     )}
-                    wrapperStyle={{ paddingLeft: 16, lineHeight: "22px" }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* RIGHT legend + detail panel */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+                  {crimeTypeData.slice(halfIdx).map((entry, i) => {
+                    const realIdx  = halfIdx + i;
+                    const pct      = ((entry.value / totalForYear) * 100).toFixed(1);
+                    const isActive = activeSlice === realIdx;
+                    return (
+                      <div key={entry.name} className={`leg-row ${isActive ? "active-leg" : ""}`} onClick={() => setActiveSlice(isActive ? null : realIdx)}>
+                        <div className="leg-dot" style={{ background: isActive ? ACTIVE_COLOR : "#3a231c", border: `1px solid ${isActive ? ACTIVE_COLOR : "#5a332c"}` }} />
+                        <span className="leg-name">{entry.name}</span>
+                        <span className="leg-pct">{pct}%</span>
+                      </div>
+                    );
+                  })}
+
+                  {/* Detail card */}
+                  {activeData && (
+                    <div className="detail-fade" style={{ marginTop: "0.75rem", background: "rgba(255,107,74,0.05)", border: "1px solid rgba(255,107,74,0.18)", padding: "0.875rem 1rem" }}>
+                      <div style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.42rem", color: "#ff6b4a", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "0.35rem" }}>
+                        Selected Crime Type
+                      </div>
+                      <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "1.05rem", color: "#fff", letterSpacing: "0.04em", lineHeight: 1.15, marginBottom: "0.6rem" }}>
+                        {activeData.name}
+                      </div>
+                      <div style={{ display: "flex", gap: "1.25rem", marginBottom: "0.6rem" }}>
+                        <div>
+                          <div style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.38rem", color: "#555e6a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1px" }}>Incidents</div>
+                          <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "1.5rem", color: ACTIVE_COLOR, lineHeight: 1 }}>{activeData.value.toLocaleString()}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontFamily: "'Space Mono',monospace", fontSize: "0.38rem", color: "#555e6a", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "1px" }}>Share</div>
+                          <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "1.5rem", color: "#e2e8f0", lineHeight: 1 }}>{activePercent}%</div>
+                        </div>
+                      </div>
+                      {/* Proportion bar */}
+                      <div style={{ height: 2, background: "rgba(255,107,74,0.1)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${activePercent}%`, background: ACTIVE_COLOR, transition: "width 0.3s ease" }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+              </div>
             )}
           </div>
         </div>
@@ -502,7 +597,7 @@ export default function Dashboard() {
               <YAxis tick={axisStyle} axisLine={false} tickLine={false}
                 tickFormatter={(v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} />
               <Tooltip content={<SentinelTooltip />} />
-              <Bar dataKey="count" name={selectedCrimeType} fill="#38bdf8" radius={[2,2,0,0]}
+              <Bar dataKey="count" name={selectedCrimeType} fill="#ff6b4a" radius={[2,2,0,0]}
                 background={{ fill: "rgba(255,107,74,0.04)" }} />
             </BarChart>
           </ResponsiveContainer>
@@ -514,9 +609,7 @@ export default function Dashboard() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
               <div>
                 <div className="db-section-label">Threat Assessment</div>
-                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "1.6rem", color: "#fff", letterSpacing: "0.04em" }}>
-                  High-Risk Districts
-                </div>
+                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "1.6rem", color: "#fff", letterSpacing: "0.04em" }}>High-Risk Districts</div>
               </div>
               <button className="db-btn db-btn-outline" onClick={handleExportCSV}><Download size={11} /> Export Data</button>
             </div>

@@ -332,7 +332,7 @@ export default function Predictions() {
     }));
 
     points.push({
-      year: "2026",
+      year: "2027",
       actual: null,
       predicted: selectedCategoryPercent,
     });
@@ -446,7 +446,7 @@ export default function Predictions() {
               <div className="eyebrow">— PREDICTIVE ANALYTICS ENGINE — RANDOM FOREST CLASSIFIER</div>
               <h1 className="title">
                 CRIME CLASSIFICATION &<br />
-                <span>RISK ANALYSIS 2026</span>
+                <span>RISK ANALYSIS 2027</span>
               </h1>
               <div className="subtitle">Strategic Forecasting • Sri Lanka District Model</div>
             </div>
