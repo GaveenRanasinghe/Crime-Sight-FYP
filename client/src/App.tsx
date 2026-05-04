@@ -295,7 +295,7 @@ function Navigation({ onSidebarStateChange }: { onSidebarStateChange: (open: boo
     { href: "/", label: "Home", Icon: Icons.Home },
     { href: "/dashboard", label: "Dashboard", Icon: Icons.Dashboard },
     { href: "/map", label: "Crime Map", Icon: Icons.Map },
-    { href: "/predictions", label: "Predictions", Icon: Icons.Predictions },
+    { href: "/predictions", label: "Classification", Icon: Icons.Predictions },
   ];
 
   const isActive = (href: string) =>

@@ -500,8 +500,8 @@ export default function Predictions() {
                 )}
               </div>
               <div className="status-row">
-                <span className="tag green">Operational</span>
-                <span className="tag yellow">Random Forest</span>
+               
+                
               </div>
             </div>
           </div>
@@ -673,7 +673,7 @@ export default function Predictions() {
                 <div className="waiting-ring"><Target size={34} color="#ff7a18" /></div>
                 <div className="impact-title">AWAITING DISTRICT SELECTION</div>
                 <p style={{ color: "#777", maxWidth: 420, lineHeight: 1.7, fontFamily: "Space Mono", fontSize: ".72rem" }}>
-                  Select a district to activate Random Forest crime classification and percentage-based risk analysis.
+                  Select a district to activate RF crime classification.
                 </p>
               </div>
             </div>
