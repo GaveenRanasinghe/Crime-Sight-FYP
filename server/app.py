@@ -8,7 +8,7 @@ from auth import create_token, require_auth, require_admin, verify_token
 import traceback
 import joblib
 
-# Load ML model
+
 model = joblib.load("rf_model.pkl")
 df_percent = joblib.load("df_percent.pkl")
 
