@@ -311,7 +311,7 @@ function Navigation({ onSidebarStateChange }: { onSidebarStateChange: (open: boo
 
         {/* Logo */}
         <div className="sidebar-logo">
-          <div className="sidebar-logo-icon">SL</div>
+          <div className="sidebar-logo-icon">CS</div>
           {sidebarOpen && (
             <div style={{ overflow: "hidden" }}>
               <div className="sidebar-logo-text">CRIME SIGHT</div>
